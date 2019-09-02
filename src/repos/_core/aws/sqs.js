@@ -1,13 +1,3 @@
-
-let _db
-const getDB = () => {
-	if (!_db) {
-		const AWS = require('aws-sdk')
-		_db = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'})
-	}
-	return _db
-}
-
 let _sqs
 const getSQS = () => {
 	if (!_sqs) {
@@ -57,7 +47,6 @@ const deleteMessage = ({ queue, id }) => new Promise((success, failure) => {
 })
 
 module.exports = {
-	getDB,
 	getSQS,
 	queue: {
 		send,

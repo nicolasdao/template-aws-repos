@@ -1,5 +1,3 @@
-
 module.exports = {
-	...require('./core'),
-	...require('./dynamo_db')
+	aws: require('./aws')
 }
