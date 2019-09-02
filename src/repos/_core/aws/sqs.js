@@ -48,11 +48,9 @@ const deleteMessage = ({ queue, id }) => new Promise((success, failure) => {
 
 module.exports = {
 	getSQS,
-	queue: {
-		send,
-		pull,
-		message: {
-			delete: deleteMessage
-		}
+	send,
+	pull,
+	message: {
+		delete: deleteMessage
 	}
 }
