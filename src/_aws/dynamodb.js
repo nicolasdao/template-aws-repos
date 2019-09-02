@@ -1,7 +1,7 @@
 const co = require('co')
 const crypto = require('crypto')
 const { tools: { throttle } } = require('core-async')
-const { promise: { retry } } = require('../../../utils')
+const { promise: { retry } } = require('../utils')
 
 let _db
 const getDB = () => {

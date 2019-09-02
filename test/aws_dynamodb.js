@@ -7,7 +7,7 @@
 */
 
 const { assert } = require('chai')
-const { aws: { dynamodb: { _:{ mustBe, mustBeArrayOf, mustExist, convertToQueryParams, getWhereClause } } } } = require('../src/repos/_core')
+const { dynamodb: { _:{ mustBe, mustBeArrayOf, mustExist, convertToQueryParams, getWhereClause } } } = require('../src/_aws')
 
 describe('repos.core._', () => {
 	describe('#mustExist', () => {

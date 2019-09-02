@@ -1,4 +1,4 @@
-const { aws: { dynamodb: { Table } } } = require('./_core')
+const { dynamodb: { Table } } = require('../_aws')
 
 const TABLE = () => process.env.NUMBER_TABLE
 
