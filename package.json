@@ -1,0 +1,40 @@
+{
+  "name": "emptyjs",
+  "version": "0.0.6",
+  "description": "",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nicolasdao/template-emptyjs.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nicolasdao/template-emptyjs/issues"
+  },
+  "homepage": "https://github.com/nicolasdao/template-emptyjs#readme",
+  "scripts": {
+    "dev": "NODE_ENV=dev node-dev -r sls-config-parser/setenv index.js --inclcreds",
+    "lint": "eslint index.js src/ test/ --fix",
+    "push": "git push --follow-tags origin master",
+    "rls": "standard-version --release-as",
+    "start": "NODE_ENV=production node index.js",
+    "test": "mocha --exit",
+    "v": "node -e \"console.log(require('./package.json').version)\""
+  },
+  "author": "Nicolas Dao",
+  "license": "BSD-3-Clause",
+  "devDependencies": {
+    "chai": "^4.1.2",
+    "eslint": "^4.19.1",
+    "mocha": "^5.2.0",
+    "node-dev": "^4.0.0",
+    "sls-config-parser": "0.0.8",
+    "standard-version": "^6.0.1"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.521.0",
+    "co": "^4.6.0",
+    "core-async": "^0.1.1",
+    "form-data": "^2.4.0",
+    "node-fetch": "^2.3.0"
+  }
+}
