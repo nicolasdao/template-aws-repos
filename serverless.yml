@@ -1,0 +1,45 @@
+
+service: your-new-service
+
+custom:
+  stage: ${opt:stage, 'dev'}
+
+plugins:
+  - serverless-iam-roles-per-function
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+  profile: your_profile
+  stage: ${self:custom.stage}
+  region: ap-southeast-2
+
+functions:
+  syncStresses:
+    handler: src/lambdas/sync_stresses.handler
+    events:
+      - http:
+          path: /syncstresses
+          method: ANY
+      - http:
+          path: /syncstresses/{any+}
+          method: ANY
+    iamRoleStatementsInherit: true
+    iamRoleStatements:
+      - Effect: 'Allow'
+        Action:
+          - lambda:InvokeFunction
+        Resource: 
+          Fn::GetAtt: 
+            - SyncLocationLambdaFunction
+            - Arn
+    environment:
+      SYNC_LOCATION_LAMBDA:
+        Fn::GetAtt: 
+            - SyncLocationLambdaFunction
+            - Arn
+  syncLocation:
+    handler: src/lambdas/sync_location.handler
+
+
+

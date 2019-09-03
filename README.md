@@ -1,43 +1,55 @@
-# Empty Project &middot; [![Tests](https://travis-ci.org/nicolasdao/template-emptyjs.svg?branch=master)](https://travis-ci.org/nicolasdao/template-emptyjs) [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause) [![Neap](https://neap.co/img/made_by_neap.svg)](#this-is-what-we-re-up-to)
-__*Empty project*__ which does heaps of cool stuff.
+# AWS SDK Repos &middot; [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause) [![Neap](https://neap.co/img/made_by_neap.svg)](#this-is-what-we-re-up-to)
+The __*AWS SDK Repos*__ project is a fork from the [https://github.com/nicolasdao/template-emptyjs](https://github.com/nicolasdao/template-emptyjs) project with an extra `_aws` folder and and extra `repos` folder. The first folder contains wrappers around the `AWS SDK` (easier APIs and retry mechanism) while the last folder contains concrete examples on how to use those wrappers.
 
 # Table of Contents
 
 > * [Install](#install) 
-> * [How To Use It](#how-to-use-it) 
->   - [Basic](#basic)
->   - [Config](#config)
-> * [FAQ](#faq)
+> * [Getting started](#getting-started)
 > * [About Neap](#this-is-what-we-re-up-to)
 > * [License](#license)
 
 
 # Install
 ```
-git clone https://github.com/nicolasdao/template-emptyjs.git new-project-name
+git clone https://github.com/nicolasdao/template-dynamodb-repos.git new-project-name
 cd new-project-name
 npm install
 npm test
 npm start
 ```
 
-# How To Use It
-## Basic
+# Getting started
+## DynnamoDB
 
-  | #  |Task             | Command                                                       | Note                                               | 
-  |:-:| :--------------- |:------------------------------------------------------------- |:---------------------------------------------------|
-  | 1 | Start            | `npm start`                                                   | Starts node with hot reload thanks to `node-dev`.   |
-  | 2 | Lint             | `npm run lint`                                              	 | Lints and automatically fixes errors when possible. |
-  | 3 | Current version | `npm run v` | Gets the current version of your project. |
-  | 4 | Increase version | `npm run rls 1.1.0` | Sets the version to a specific number. |
-  | 5 | Test             | `npm test`                                                    | Tests all files in the `test` folder.               |
+```js
+const { my_table } = require('./src/repos')
 
-## Config
+my_table
+	.insert({ device_id:1, timestamp:new Date(), data: { hello:'world' } })
+	.then(console.log)
 
-__*Update The git Repo:*__ `git remote set-url origin https://github.com/nicolasdao/project.git`
+my_table
+	.query('device_id').eq(1)
+	.and('timestamp').between(['2019-08-01', '2019-08-02'])
+	.sortByRange('desc')
+	.limit(20)
+	.execute()
+	.then(console.log)
 
-# FAQ
-Blablabla
+my_table
+	.query('device_id').eq(1)
+	.and('timestamp').between(['2019-08-01', '2019-08-02'])
+	.first()
+	.execute()
+	.then(console.log)
+
+my_table
+	.query('device_id').eq(1)
+	.and('timestamp').between(['2019-08-01', '2019-08-02'])
+	.last()
+	.execute()
+	.then(console.log)
+```
 
 # This Is What We re Up To
 We are Neap, an Australian Technology consultancy powering the startup ecosystem in Sydney. We simply love building Tech and also meeting new people, so don't hesitate to connect with us at [https://neap.co](https://neap.co).
