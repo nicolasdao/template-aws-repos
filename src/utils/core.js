@@ -272,10 +272,20 @@ const toBoolean = (val,_default) => {
 	return (_v == 'true' || _v == '1') ? true : (_v == 'false' || _v == '0') ? false : _default
 }
 
-const toArray  = (val,_default) => {
+const toObj  = (val,_default) => {
 	const _v = `${val}`.trim()
 	try {
 		return JSON.parse(_v)
+	} catch(e) {
+		return (() => _default)(e)
+	}
+}
+
+const toArray  = (val,_default) => {
+	const _v = `${val}`.trim()
+	try {
+		const a = JSON.parse(_v)
+		return Array.isArray(a) ? a : [a]
 	} catch(e) {
 		return (() => _default)(e)
 	}
@@ -924,7 +934,8 @@ module.exports = {
 		addZero,
 		toNumber,
 		toBoolean,
-		toArray
+		toArray,
+		toObj
 	},
 	date: {
 		timestamp: getTimestamp,
