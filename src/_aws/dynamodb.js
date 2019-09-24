@@ -336,6 +336,9 @@ const _convertToQueryParams = ({ where }, options) => {
  * @yield {Object} output.LastEvaluatedKey		{ 'hash_key':..., 'range_key':... }. For example, 
  *        										If the hash key is location_id and the range key is timestamp, this object 
  *        										could be { location_id: 123, timestamp:'2019-09-22T17:45:00.000Z' }
+ *
+ * 												If this value exists, this means that the maximum payload was reached
+ * 												and that there is more data.
  */
 const _query = ({ table, where }) => new Promise((success, failure) => {	
 	try {
