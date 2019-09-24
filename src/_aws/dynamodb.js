@@ -1,3 +1,4 @@
+// v.0.0.2 - Last update 2019-09-24
 const co = require('co')
 const crypto = require('crypto')
 const { tools: { throttle } } = require('core-async')
@@ -170,20 +171,30 @@ const _addWhereClause = ({ field, condition, whereClauses }, options) => {
 
 /**
  * [description]
- * @param  {Array}  		whereClauses 	Accumulator with all the where clauses
- * @return {Function} 		output.and		field => <WhereClause>
- * @return {Function} 		output.or		field => <WhereClause>
- * @return {Function} 		output.clause	() => [{ field:<string>, op:<string>, value: <object> }, ...]
+ * @param  {Array}  		whereClauses 		Accumulator with all the where clauses
+ * @return {Function} 		output.and			field => <WhereClause>
+ * @return {Function} 		output.or			field => <WhereClause>
+ * @return {Function} 		output.first		() => <WhereClause>
+ * @return {Function} 		output.last			() => <WhereClause>
+ * @return {Object} 		output.cursor		cursor => <WhereClause> where 'cursor' could be { location_id: 123, timestamp: '2018-09-22T17:45:00.000Z' }. 
+ *                                   			This object is returned by the '_query' function in the 'LastEvaluatedKey' property.
+ * @return {Function} 		output.sortByRange	dir => <WhereClause> where 'dir' can only be null (eq. to 'asc'), 'asc' or 'desc'
+ * @return {Function} 		output.limit		number => <WhereClause> when 'number' equals 0, that means return all.
+ * @return {Function} 		output.clause		() => [{ field:<string>, op:<string>, value: <object> }, ...]
  */
 const _andOrSortLimitClauses = ({ whereClauses }, options) => ({
 	and: field => _addWhereClause({ field, condition:'and', whereClauses }, options),
 	or: field => _addWhereClause({ field, condition:'or', whereClauses }, options),
 	sortByRange: dir => {
-		whereClauses.sortByRange = dir 
+		whereClauses.sortByRange = dir == 'desc' ? 'desc' : 'asc'
 		return _andOrSortLimitClauses({ whereClauses }, options)
 	},
 	limit: l => {
 		whereClauses.limit = l 
+		return _andOrSortLimitClauses({ whereClauses }, options)
+	},
+	cursor: cursor => {
+		whereClauses.cursor = cursor
 		return _andOrSortLimitClauses({ whereClauses }, options)
 	},
 	last: () => {
@@ -219,7 +230,7 @@ const _createOp = ({ field, op, value, whereClauses }, options) => {
 
 /**
  * [description]
- * @param  {String|Object}	field	
+ * @param  {String|Object}	field			e.g., 'name'
  * 		
  * @return {WhereClause}	output	
  * @return {Function}	
@@ -260,11 +271,17 @@ const COMPARATORS = { eq: '=', gt: '>', lt: '<', ge: '>=', le: '<=', ne:'<>' }
 /**
  * 
  * @param  {Array} 	 where						e.g., [{ field:'device_id', op:'eq', value:1 }, 'and', { field:'timestamp', op:'between', value:['2019-08-01T00:00Z', '2019-08-02T00:00Z'] }]
+ * @param  {Number}  where.limit				The 'where' array also supports addictional metadata. When 'limit' is 0, 
+ *                                  			this means that the all data must be retrieved (equivalent to 'limit' null).
+ * @param  {Object}  where.cursor				e.g., { location_id: 123, timestamp: '2018-09-22T17:45:00.000Z' }. This object is returned by the '_query' function 
+ *                               				in the 'LastEvaluatedKey' property.
  * @param  {Boolean} options.uniqueId			Default true. False means that the 'ExpressionAttributeValues' are not anonymoized.
  * 
  * @return {String}  KeyConditionExpression		e.g., '#device_id = :device_id AND #timestamp BETWEEN :start_e2d2 AND :end_e2d2'
  * @return {Object}  ExpressionAttributeNames	e.g., { '#device_id': 'device_id', '#timestamp': 'timestamp' }
  * @return {Object}  ExpressionAttributeValues	e.g., { ':device_id': 1, ':start_e2d2': '2019-08-01T00:00Z', ':end_e2d2': '2019-08-02T00:00Z' }
+ * @return {Object}  ExclusiveStartKey			That's the 'cursor'
+ * @return {Number}  Limit							
  */
 const _convertToQueryParams = ({ where }, options) => {
 	const { uniqueId=true } = options || {}
@@ -320,7 +337,7 @@ const _convertToQueryParams = ({ where }, options) => {
 		}
 
 		return acc
-	}, { KeyConditionExpression:'', ExpressionAttributeNames:{}, ExpressionAttributeValues:{} })
+	}, { KeyConditionExpression:'', ExpressionAttributeNames:{}, ExpressionAttributeValues:{}, ExclusiveStartKey: where.cursor, Limit: where.limit === 0 ? null : where.limit })
 }
 
 /**
@@ -333,7 +350,7 @@ const _convertToQueryParams = ({ where }, options) => {
  * @yield {[Object]} output.Items				Array of records
  * @yield {Number} 	 output.Count				
  * @yield {Number} 	 output.ScannedCount
- * @yield {Object} output.LastEvaluatedKey		{ 'hash_key':..., 'range_key':... }. For example, 
+ * @yield {Object}   output.LastEvaluatedKey	{ 'hash_key':..., 'range_key':... }. For example, 
  *        										If the hash key is location_id and the range key is timestamp, this object 
  *        										could be { location_id: 123, timestamp:'2019-09-22T17:45:00.000Z' }
  *
@@ -342,7 +359,7 @@ const _convertToQueryParams = ({ where }, options) => {
  */
 const _query = ({ table, where }) => new Promise((success, failure) => {	
 	try {
-		const { KeyConditionExpression, ExpressionAttributeNames, ExpressionAttributeValues } = _convertToQueryParams({ where })
+		const { KeyConditionExpression, ExpressionAttributeNames, ExpressionAttributeValues, ExclusiveStartKey, Limit } = _convertToQueryParams({ where })
 
 		const ScanIndexForward = !where.sortByRange ? undefined : where.sortByRange == 'asc' ? true : where.sortByRange == 'desc' ? false : undefined
 
@@ -351,8 +368,9 @@ const _query = ({ table, where }) => new Promise((success, failure) => {
 			KeyConditionExpression,
 			ExpressionAttributeNames,
 			ExpressionAttributeValues,
+			ExclusiveStartKey,
 			ScanIndexForward,
-			Limit: where.limit
+			Limit
 		}, (err, data) => err ? failure(err): success(data))
 	} catch (err) {
 		failure(err)
@@ -372,6 +390,23 @@ const _insertEntity = ({ table, entity }) => new Promise((success, failure) => {
 	}
 })
 
+/**
+ * Query a DynamoDB table.
+ *
+ * @param  {String}  input.table			
+ * @param  {Array} 	 input.where	e.g., [{ field:'device_id', op:'eq', value:1 }, 'and', { field:'timestamp', op:'between', value:['2019-08-01T00:00Z', '2019-08-02T00:00Z'] }]
+ *                          		which could be created with _getWhereClause('device_id').eq(1).and('timestamp').between(['2019-08-01T00:00Z', '2019-08-02T00:00Z'])
+ * 
+ * @yield {[Object]} output.Items				Array of records
+ * @yield {Number} 	 output.Count				
+ * @yield {Number} 	 output.ScannedCount
+ * @yield {Object}   output.LastEvaluatedKey	{ 'hash_key':..., 'range_key':... }. For example, 
+ *        										If the hash key is location_id and the range key is timestamp, this object 
+ *        										could be { location_id: 123, timestamp:'2019-09-22T17:45:00.000Z' }
+ *
+ * 												If this value exists, this means that the maximum payload was reached
+ * 												and that there is more data.
+ */
 const _queryWithRetry = input => retry({
 	fn: () => _query(input),
 	retryOnFailure: err => err && (err.code == 'ProvisionedThroughputExceededException') || (err.code == 'UnknownEndpoint'),
@@ -463,9 +498,46 @@ const Table = function({ name, schema }) {
 
 	this.where = _getWhereClause
 
-	this.query = field => {
-		const execute = where => _queryWithRetry({ table:getTableName(), where })
-		return _getWhereClause(field, null, { execute }) 
+	/**
+	 * Query a DynamoDB table.
+	 *
+	 * @param  {String|Object}	field				e.g., 'name'	
+	 * 
+	 * @yield {[Object]} output.Items				Array of records
+	 * @yield {Number} 	 output.Count				
+	 * @yield {Number} 	 output.ScannedCount
+	 * @yield {Object}   output.LastEvaluatedKey	
+	 */
+	this.query = (field) => {
+		const execute = where => {
+			const getData = where => _queryWithRetry({ table:getTableName(), where })
+				.then(data => {
+					data.Items = data.Items || []
+					data.Count = data.Count || 0
+					data.ScannedCount = data.ScannedCount || 0
+					if (where.limit === 0 && data.LastEvaluatedKey && typeof(data.LastEvaluatedKey) == 'object') { // get all data
+						// Clone of 'where' into the '_where' so we can mutate 'cursor' without affecting 'where'
+						let _where = where.map(x => x)
+						const whereProps = Object.keys(where)
+						const extraProps = whereProps.slice(where.length - whereProps.length)
+						extraProps.forEach(prop => _where[prop] = where[prop])
+						// Update the 'cursor'
+						_where.cursor = data.LastEvaluatedKey
+
+						// Get the next batch of data and append it to the current one.
+						return getData(_where).then(tail => {
+							data.Items.push(...tail.Items)
+							data.Count += tail.Count
+							data.ScannedCount += tail.ScannedCount
+							data.LastEvaluatedKey = tail.LastEvaluatedKey
+							return data
+						})
+					} else
+						return data
+				})
+			return getData(where)
+		}
+		return _getWhereClause(field, null, { execute })
 	}
 
 	/**
