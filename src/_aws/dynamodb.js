@@ -330,7 +330,12 @@ const _convertToQueryParams = ({ where }, options) => {
  * @param  {Array} 	 where			e.g., [{ field:'device_id', op:'eq', value:1 }, 'and', { field:'timestamp', op:'between', value:['2019-08-01T00:00Z', '2019-08-02T00:00Z'] }]
  *                          		which could be created with _getWhereClause('device_id').eq(1).and('timestamp').between(['2019-08-01T00:00Z', '2019-08-02T00:00Z'])
  * 
- * @yield {[Object]} output.Items
+ * @yield {[Object]} output.Items				Array of records
+ * @yield {Number} 	 output.Count				
+ * @yield {Number} 	 output.ScannedCount
+ * @yield {Object} output.LastEvaluatedKey		{ 'hash_key':..., 'range_key':... }. For example, 
+ *        										If the hash key is location_id and the range key is timestamp, this object 
+ *        										could be { location_id: 123, timestamp:'2019-09-22T17:45:00.000Z' }
  */
 const _query = ({ table, where }) => new Promise((success, failure) => {	
 	try {
