@@ -32,7 +32,7 @@ my_table
 	.query('device_id').eq(1)
 	.and('timestamp').between(['2019-08-01', '2019-08-02'])
 	.sortByRange('desc')
-	.limit(20)
+	.limit(20) // use .limit(0) if you want to get all the data across all pages.
 	.execute()
 	.then(console.log)
 
