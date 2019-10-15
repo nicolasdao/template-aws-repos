@@ -7,6 +7,14 @@ const getSQS = () => {
 	return _sqs
 }
 
+/**
+ * Pushes a message to a queue.
+ * 
+ * @param  {String}			queue		Queue's ARN
+ * @param  {String|Object}	body		The body can be anything, but eventually, it is stringified.
+ *                               		(WARNING: Max size is 250KB)
+ * @yield  {Object}			output		AWS SNS response
+ */
 const send = ({ queue, body }) => new Promise((success, failure) => {
 	try {
 		getSQS().sendMessage({
@@ -19,6 +27,15 @@ const send = ({ queue, body }) => new Promise((success, failure) => {
 	}
 })
 
+/**
+ * Pulls messages from a queue.
+ * 
+ * @param  {String}		queue	Queue's ARN
+ * @param  {Number}		max		Default 1, max 10.
+ * 
+ * @yield  {String}		output.Messages[].Body
+ * @yield  {String}		output.Messages[].ReceiptHandle		This is the message ID. Use it to delete the message from the queue.
+ */
 const pull = ({ queue, max }) => new Promise((success, failure) => {
 	try {
 		getSQS().receiveMessage({
@@ -31,6 +48,13 @@ const pull = ({ queue, max }) => new Promise((success, failure) => {
 	}
 })
 
+/**
+ * Pushes a message to a queue.
+ * 
+ * @param  {String}		queue	Queue's ARN
+ * @param  {String}		id		Message's ID (aka ReceiptHandle)
+ * @yield  {Object}		output	AWS SNS response
+ */
 const deleteMessage = ({ queue, id }) => new Promise((success, failure) => {
 	try {
 		getSQS().deleteMessage({
