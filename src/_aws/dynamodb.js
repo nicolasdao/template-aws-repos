@@ -1,4 +1,11 @@
-// v.0.0.2 - Last update 2019-09-24
+/**
+ * Copyright (c) 2017-2019, Neap Pty Ltd.
+ * All rights reserved.
+ * 
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree.
+*/
+
 const crypto = require('crypto')
 const { co, tools: { throttle } } = require('core-async')
 const { promise: { retry } } = require('../utils')
