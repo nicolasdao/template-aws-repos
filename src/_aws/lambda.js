@@ -1,4 +1,4 @@
-const co = require('co')
+const { co } = require('core-async')
 const { fetch } = require('../utils')
 
 let _lambda

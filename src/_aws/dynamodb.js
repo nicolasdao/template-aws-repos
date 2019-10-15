@@ -1,7 +1,6 @@
 // v.0.0.2 - Last update 2019-09-24
-const co = require('co')
 const crypto = require('crypto')
-const { tools: { throttle } } = require('core-async')
+const { co, tools: { throttle } } = require('core-async')
 const { promise: { retry } } = require('../utils')
 
 let _db
