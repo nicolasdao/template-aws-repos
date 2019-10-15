@@ -11,7 +11,7 @@ The __*AWS SDK Repos*__ project is a fork from the [https://github.com/nicolasda
 
 # Install
 ```
-git clone https://github.com/nicolasdao/template-dynamodb-repos.git new-project-name
+git clone https://github.com/nicolasdao/template-aws-repos.git new-project-name
 cd new-project-name
 npm install
 npm test
