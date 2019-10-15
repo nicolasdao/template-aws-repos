@@ -13,6 +13,7 @@
   "homepage": "https://github.com/nicolasdao/template-aws-repos#readme",
   "scripts": {
     "dev": "NODE_ENV=dev node-dev -r sls-config-parser/setenv index.js --inclcreds",
+    "prod": "NODE_ENV=dev node-dev -r sls-config-parser/setenv index.js --inclcreds --stage prod --force 'provider.profile=neap;provider.region=ap-southeast-2'",
     "lint": "eslint index.js src/ test/ --fix",
     "push": "git push --follow-tags origin master",
     "rls": "standard-version --release-as",
