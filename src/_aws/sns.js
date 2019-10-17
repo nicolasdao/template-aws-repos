@@ -107,6 +107,16 @@ const getTopic = topicARN => {
 		get ARN() {
 			return topicARN
 		},
+		/**
+		 * Sends SNS message.
+		 *
+		 * @param  {String|Object}	payload.body		The body can be anything, but eventually, it is stringified.
+ 		 *                                        		(WARNING: Max size is 250KB)
+ 		 * @param  {Object}			payload.attributes	e.g., { 'your-attribute-name': 'whatever value' }
+ 		 * 
+		 * @yield  {String}		output.ResponseMetadata.RequestId
+		 * @yield  {String}		output.MessageId	
+		 */
 		send: payload => _send(topicARN, payload)
 	}
 }
