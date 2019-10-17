@@ -206,7 +206,42 @@ const objectS2Ccase = obj => {
 	}, {})
 }
 
-const _supportedEncoding = { 'hex': true, 'utf8': true, 'base64': true, 'ascii': true, 'buffer': true }
+const _hexToBin = hexaString => {
+	if (!hexaString)
+		return ''
+
+	const mapping = {
+		'0': '0000',
+		'1': '0001',
+		'2': '0010',
+		'3': '0011',
+		'4': '0100',
+		'5': '0101',
+		'6': '0110',
+		'7': '0111',
+		'8': '1000',
+		'9': '1001',
+		'a': '1010',
+		'b': '1011',
+		'c': '1100',
+		'd': '1101',
+		'e': '1110',
+		'f': '1111',
+		'A': '1010',
+		'B': '1011',
+		'C': '1100',
+		'D': '1101',
+		'E': '1110',
+		'F': '1111'
+	}
+	let bitmaps = ''
+	for (let i = 0; i < hexaString.length; i++)
+		bitmaps += mapping[hexaString[i]]
+
+	return bitmaps
+}
+
+const _supportedEncoding = { 'hex': true, 'utf8': true, 'base64': true, 'ascii': true, 'buffer': true, 'bin':true }
 // Examples: 
 //	encoder('Hello').to('buffer')
 //	encoder('Hello').to('base64')
@@ -224,20 +259,26 @@ const encoder = (obj, options) => {
 		throw new Error(`Wrong argument exception. The 'encoder' method only accept the following encoding types: 'hex', 'utf8', 'base64', 'buffer' and 'ascii' (current: ${type})`)
 	return {
 		to: encoding => {
-			encoding = encoding || 'utf8'
-			if (!_supportedEncoding[encoding])
-				throw new Error(`Wrong argument exception. The 'encoder.to' method only accept the following encoding types: 'hex', 'utf8', 'base64', 'buffer' and 'ascii' (current: ${encoding})`)
+			const _convert = enc => {
+				if (!_supportedEncoding[enc])
+					throw new Error(`Wrong argument exception. The 'encoder.to' method only accept the following encoding types: 'hex', 'utf8', 'base64', 'buffer' and 'ascii' (current: ${enc})`)
 
-			if (isString) {
-				if (encoding == 'buffer')
-					return o ? Buffer.from(o, type) : new Buffer(0)
+				if (isString) {
+					if (enc == 'buffer')
+						return o ? Buffer.from(o, type) : new Buffer(0)
+					else
+						return Buffer.from(o, type).toString(enc)
+				}
+				else if (enc == 'buffer')
+					return o 
 				else
-					return Buffer.from(o, type).toString(encoding)
+					return o.toString(enc)
 			}
-			else if (encoding == 'buffer')
-				return o 
-			else
-				return o.toString(encoding)
+
+			encoding = encoding || 'utf8'
+			const isBin = encoding == 'bin'
+			const v = _convert(isBin ? 'hex' : encoding)
+			return isBin ? _hexToBin(v) : v
 		}
 	}
 }
@@ -259,7 +300,15 @@ const addZero = (nbr,l) => {
 }
 
 const toNumber = (val,_default) => {
-	const _v = `${val}`.trim()
+	if (val === null || val === undefined)
+		return 0 
+
+	const t = typeof(val)
+	if (t == 'boolean')
+		return val ? 1 : 0
+
+	const _v = (t == 'string' ? val.trim(): `${val}`).toLowerCase()
+
 	const v = _v*1
 	if (!_v || isNaN(v))
 		return _default === undefined ? null : _default
@@ -268,12 +317,32 @@ const toNumber = (val,_default) => {
 }
 
 const toBoolean = (val,_default) => {
-	const _v = `${val}`.trim().toLowerCase()
+	if (val === null || val === undefined)
+		return false 
+
+	const t = typeof(val)
+	if (t == 'number')
+		return t == 0 ? false : true
+	else if (t == 'boolean')
+		return val
+	else if (t == 'object')
+		return true
+
+	const _v = (t == 'string' ? val.trim(): `${val}`).toLowerCase()
 	return (_v == 'true' || _v == '1') ? true : (_v == 'false' || _v == '0') ? false : _default
 }
 
 const toObj  = (val,_default) => {
-	const _v = `${val}`.trim()
+	if (!val)
+		return null
+
+	const t = typeof(val)
+
+	if (t == 'object')
+		return val
+
+	const _v = t == 'string' ? val.trim() : `${val}`
+
 	try {
 		return JSON.parse(_v)
 	} catch(e) {
@@ -282,7 +351,13 @@ const toObj  = (val,_default) => {
 }
 
 const toArray  = (val,_default) => {
-	const _v = `${val}`.trim()
+	if (!val)
+		return []
+
+	const t = typeof(val)
+
+	const _v = t == 'string' ? val.trim() : `${val}`
+
 	try {
 		const a = JSON.parse(_v)
 		return Array.isArray(a) ? a : [a]
