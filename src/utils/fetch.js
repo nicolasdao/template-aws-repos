@@ -74,7 +74,7 @@ const _processResponse = (res, uri, options={}) => {
  * 	_fetch({ uri: 'https://example.com/yourapi' }, 'GET').then(({ data }) => console.log(data)) // shows JSON object
  *
  *	// Downloading a file
- * 	_fetch({ uri: 'https://example.com/image/test.jpeg', parser: 'buffer' }, 'GET').then(({ data }) => console.log(data)) // shows buffer
+ * 	_fetch({ uri: 'https://example.com/image/test.jpeg', parsing: 'buffer' }, 'GET').then(({ data }) => console.log(data)) // shows buffer
  *
  * 	// Downloading a file using a custom stream reader
  * 	const chunks = []
