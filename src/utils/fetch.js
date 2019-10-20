@@ -20,7 +20,10 @@ const { retry } = require('./promise')
  * @param  {Writable} options.streamReader 	
  * @param  {String}   options.dst		Path to a destination file
  * @param  {String}   options.parsing		e.g., 'json' to force the parsing method to json. Valid values: 'json', 'text', 'buffer'
- * @return {[type]}         				
+ * 
+ * @yield {Number}   		output.status
+ * @yield {Object}   		output.data
+ * @yield {Object}   		output.headers        				
  */
 const _processResponse = (res, uri, options={}) => {
 	let contentType = res && res.headers && typeof(res.headers.get) == 'function' ? res.headers.get('content-type') : null	
@@ -92,7 +95,10 @@ const _processResponse = (res, uri, options={}) => {
  * @param  {String} 		parsing			Forces the response to be parsed using one of the following output formats:
  *                              				'json', 'text', 'buffer'
  * @param  {String}			method			Valid values: 'GET', 'POST', 'PUT', 'DELETE', 'PATCH'
- * @return {Promise}
+ * 
+ * @yield {Number}   		output.status
+ * @yield {Object}   		output.data
+ * @yield {Object}   		output.headers
  */
 const _fetch = ({ uri, headers={}, body, streamReader, dst, parsing }, method) => {
 	const _body = !body || typeof(body) == 'string' || (body instanceof Buffer) || (body instanceof FormData) ? body : JSON.stringify(body)
