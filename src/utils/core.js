@@ -206,64 +206,122 @@ const objectS2Ccase = obj => {
 	}, {})
 }
 
+const BIN_TO_HEX_MAP = {'0': '0000','1': '0001','2': '0010','3': '0011','4': '0100','5': '0101','6': '0110','7': '0111','8': '1000','9': '1001','a': '1010','b': '1011','c': '1100','d': '1101','e': '1110','f': '1111','A': '1010','B': '1011','C': '1100','D': '1101','E': '1110','F': '1111' }
 const _hexToBin = hexaString => {
-	if (!hexaString)
-		return ''
-
-	const mapping = {
-		'0': '0000',
-		'1': '0001',
-		'2': '0010',
-		'3': '0011',
-		'4': '0100',
-		'5': '0101',
-		'6': '0110',
-		'7': '0111',
-		'8': '1000',
-		'9': '1001',
-		'a': '1010',
-		'b': '1011',
-		'c': '1100',
-		'd': '1101',
-		'e': '1110',
-		'f': '1111',
-		'A': '1010',
-		'B': '1011',
-		'C': '1100',
-		'D': '1101',
-		'E': '1110',
-		'F': '1111'
-	}
 	let bitmaps = ''
+	if (!hexaString)
+		return bitmaps
+
 	for (let i = 0; i < hexaString.length; i++)
-		bitmaps += mapping[hexaString[i]]
+		bitmaps += BIN_TO_HEX_MAP[hexaString[i]]
 
 	return bitmaps
 }
 
-const _supportedEncoding = { 'hex': true, 'utf8': true, 'base64': true, 'ascii': true, 'buffer': true, 'bin':true }
+const HEX_TO_BIN_MAP = {'0000': '0','0001': '1','0010': '2','0011': '3','0100': '4','0101': '5','0110': '6','0111': '7','1000': '8','1001': '9','1010': 'A','1011': 'B','1100': 'C','1101': 'D','1110': 'E','1111': 'F' }
+const _binToHex = binString => {
+	let hex = ''
+	if (!binString)
+		return hex
+
+	let counter = 0
+	const l = binString.length
+	const s = binString.split('').reverse().join('')
+	let acc = ''
+	for (let i = 0; i < l; i++) {
+		counter++
+		acc = s[i] + acc
+		if (counter == 4) {
+			counter = 0
+			const v = HEX_TO_BIN_MAP[acc]
+			acc = ''
+			if (!v)
+				throw new Error(`Failed to convert 'binString' to hexa string. Invalid characters between index ${l-i+1} and ${l-i+4} for input ${binString}.`)
+			hex = v + hex
+		}
+	}
+
+	if (counter > 0) {
+		let h = s.slice(-counter).split('').reverse().join('')
+		if (counter == 1)
+			h = `000${h}`
+		else if (counter == 2)
+			h = `00${h}`
+		else
+			h = `0${h}`
+
+		const v = HEX_TO_BIN_MAP[h]
+		if (!v)
+			throw new Error(`Failed to convert 'binString' to hexa string. Invalid characters between index 0 and ${counter} for input ${binString}.`)
+		hex = v + hex
+	}
+
+	return hex
+}
+
+/**
+ * Makes sure that the hex string is formatted properly to be understood by the Buffer API. 
+ * 
+ * @param  {String} hex		e.g., '1', '0001'
+ * @return {String}       	e.g., '01', '0001'
+ */
+const _sanitizeHexaString = hex => {
+	if (!hex)
+		return ''
+	return hex.length%2 ? `0${hex}` : hex
+}
+
+const SUPPORTED_ENCODING = { 'hex': true, 'utf8': true, 'base64': true, 'ascii': true, 'buffer': true, 'bin':true, 'int':true }
 // Examples: 
 //	encoder('Hello').to('buffer')
 //	encoder('Hello').to('base64')
 //	encoder('SGVsbG8=', { type:'base64' }).to('utf8')
 //	encoder(buffer).to('utf8')
+
+/**
+ * Converts a string or number to various formats. Examples:
+ * 		encoder('Hello').to('buffer')
+ * 		encoder('Hello').to('base64')
+ * 		encoder('SGVsbG8=', { type:'base64' }).to('utf8')
+ * 		encoder(buffer).to('utf8')
+ * 		encoder('0001', { type:'bin' }).to('hex')
+ * 		encoder('AF', { type:'hex' }).to('bin')
+ * 		encoder('AF', { type:'hex' }).to('int')
+ * 
+ * @param  {String|Number}	obj				e.g., 'Hello', 'SGVsbG8=', '0001', 123
+ * @param  {String}			options.type	Default 'utf8'. Only meaningful if 'obj' is a string. It describes the 'obj' encoding.
+ *                                 			Valid values: 'hex', 'utf8', 'base64', 'ascii', 'buffer', 'bin', 'int'
+ * @return {Function}		output.to		Singular argument function similar to 'encoding => ...' where 'encoding' can be:
+ *                                			'hex', 'utf8', 'base64', 'ascii', 'buffer', 'bin', 'int'
+ */
 const encoder = (obj, options) => {
+	// 1. Default the current 'type'.
 	let { type } = options || {}
 	type = type || 'utf8'
-	const o = obj || ''
+
+	// 2. Modify the current input 'obj' based on the current 'type' in order to carry on with the conversion.
+	const inputIsBin = type == 'bin'
+	const isNumber = typeof(obj) == 'number' || type == 'int'
+
+	// 3. Sanitize to deal with all the scenarios.
+	let o = inputIsBin ? _binToHex(obj || '') : isNumber ? (obj*1).toString(16) : (obj || '')
+	if (inputIsBin || isNumber)
+		type = 'hex'
+
 	const isString = typeof(o) == 'string'
 	const isBuffer = o instanceof Buffer
-	if (!isString && !isBuffer)
-		throw new Error(`Wrong argument exception. The 'encoder' method only accept input of type 'string' or 'Buffer' (current: ${typeof(o)})`)
-	if (!_supportedEncoding[type])
-		throw new Error(`Wrong argument exception. The 'encoder' method only accept the following encoding types: 'hex', 'utf8', 'base64', 'buffer' and 'ascii' (current: ${type})`)
+	if (!isString && !isBuffer && !isNumber)
+		throw new Error(`Wrong argument exception. The 'encoder' method only accept input of type 'string', 'number' or 'Buffer' (current: ${typeof(o)})`)
+	if (!SUPPORTED_ENCODING[type])
+		throw new Error(`Wrong argument exception. The 'encoder' method only accept the following encoding types: ${Object.keys(SUPPORTED_ENCODING)} (current: ${type})`)
 	return {
 		to: encoding => {
 			const _convert = enc => {
-				if (!_supportedEncoding[enc])
-					throw new Error(`Wrong argument exception. The 'encoder.to' method only accept the following encoding types: 'hex', 'utf8', 'base64', 'buffer' and 'ascii' (current: ${enc})`)
+				if (!SUPPORTED_ENCODING[enc])
+					throw new Error(`Wrong argument exception. The 'encoder.to' method only accept the following encoding types: ${Object.keys(SUPPORTED_ENCODING)} (current: ${enc})`)
 
 				if (isString) {
+					o = type == 'hex' ? _sanitizeHexaString(o) : o
 					if (enc == 'buffer')
 						return o ? Buffer.from(o, type) : new Buffer(0)
 					else
@@ -277,21 +335,27 @@ const encoder = (obj, options) => {
 
 			encoding = encoding || 'utf8'
 			const isBin = encoding == 'bin'
-			const v = _convert(isBin ? 'hex' : encoding)
-			return isBin ? _hexToBin(v) : v
+			const isInt = encoding == 'int'
+			const v = _convert(isBin || isInt ? 'hex' : encoding)
+
+			if (isBin)
+				return _hexToBin(v)
+			else if (isInt)
+				return parseInt(`0x${v}`)
+			else
+				return v
 		}
 	}
 }
 
 const addZero = (nbr,l) => {
 	let r = `${nbr}`
-	if (!l || typeof(nbr) != 'number')
+	if (!l || isNaN(nbr*1))
 		return r
 
 	const currentLength = r.length
 	if (currentLength >= l)
 		return r
-
 
 	for(let i=0;i<l-currentLength;i++)
 		r = '0'+r
