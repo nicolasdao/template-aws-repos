@@ -448,6 +448,7 @@ const _insertEntityWithRetry = input => retry({
  * @return {Function} Table.insert			Function<Object|Array<Object>>: Promise<Object|Array<Object>>
  */
 const Table = function({ name, schema }) {
+	let _this = this
 	if (!name)
 		throw new Error('Missing required argument \'name\'.')
 
@@ -564,6 +565,55 @@ const Table = function({ name, schema }) {
 		const tasks = entity.map(e => (() => _insert(e,options)))
 		return yield throttle(tasks, concurrency)
 	})
+
+	/**
+	 * Adds a number to a specific field. (e.g., add(2).to('count').whereKey({ id:1 }))
+	 * 
+	 * @param  {Number} value 
+	 * @return {[type]}       [description]
+	 */
+	this.add = value => {
+		return {
+			to: field => {
+				const safeField = `#${field}`
+				let ExpressionAttributeNames = {}
+				ExpressionAttributeNames[safeField] = field
+
+				const _getNewValue = data => {
+					if (data && data.Attributes && data.Attributes[field])
+						return data.Attributes[field]
+					else
+						return null
+				}
+
+				return {
+					// IMPORTANT: If there is a range key, 'key' MUST contain it. 'key' cannot just be made of the partition key.
+					whereKey: key => new Promise((success, failure) => {
+						if (!field)
+							throw new Error(`Missing required argument 'field'.`)
+						const v = value * 1
+						const table = getTableName()
+						if (isNaN(v))
+							throw new Error(`Failed to add ${value} to field ${field} in table ${table}. The value must be a number.`)
+
+						getDB().update({ 
+							TableName: table,
+							Key: key,
+							ExpressionAttributeNames,
+							UpdateExpression: `SET ${safeField} = ${safeField} + :val`,
+							ExpressionAttributeValues:{
+								':val': v
+							},
+							ReturnValues: 'UPDATED_NEW'
+						}, (err, data) => err ? failure(err): success(_getNewValue(data)))
+					})
+				}
+			}
+		}
+	}
+
+	this.increment = field => _this.add(1).to(field)
+	this.decrement = field => _this.add(-1).to(field)
 
 	return this
 }
