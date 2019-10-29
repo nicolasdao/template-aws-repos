@@ -14,18 +14,18 @@ my_table
 	.sortByRange('desc')
 	.limit(20)
 	.execute()
-	.then(console.log)
+	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0 }
 
 my_table
 	.query('device_id').eq(1)
 	.and('timestamp').between(['2019-08-01', '2019-08-02'])
 	.first()
 	.execute()
-	.then(console.log)
+	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0 }
 
 my_table
 	.query('device_id').eq(1)
 	.and('timestamp').between(['2019-08-01', '2019-08-02'])
 	.last()
 	.execute()
-	.then(console.log)
+	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0 }
