@@ -1,11 +1,4 @@
-/**
- * Copyright (c) 2017-2019, Neap Pty Ltd.
- * All rights reserved.
- * 
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree.
-*/
-
+// v.0.0.2 - Last update 2019-09-24
 const crypto = require('crypto')
 const { co, tools: { throttle } } = require('core-async')
 const { promise: { retry } } = require('../utils')
@@ -379,16 +372,61 @@ const _query = ({ table, where }) => new Promise((success, failure) => {
 			Limit
 		}, (err, data) => err ? failure(err): success(data))
 	} catch (err) {
-		failure(err)
+		failure(new Error(err.stack))
 	}
+}).catch(err => {
+	console.log(err.stack)
+	throw new Error(err.stack)
 })
 
+const _getConditionExpression = obj => {
+	if (!obj)
+		return
 
-const _insertEntity = ({ table, entity }) => new Promise((success, failure) => {
+	const t = typeof(obj)
+	if (t != 'string' && !(Array.isArray(obj)))
+		throw new Error(`Failed to convert object to DynamoDB ConditionExpression. 'obj' must be a string or an array of string (current: ${typeof(obj)}).`)
+
+	if (t == 'string') {
+		const safeKey = `#${obj}`
+		let ExpressionAttributeNames = {}
+		ExpressionAttributeNames[safeKey] = obj
+		return {
+			ConditionExpression: `attribute_not_exists(${safeKey})`,
+			ExpressionAttributeNames
+		}
+	} else {
+		const { ConditionExpression, ExpressionAttributeNames } = obj.reduce((acc, key) => {
+			const safeKey = `#${key}`
+			acc.ExpressionAttributeNames[safeKey] = key
+			acc.ConditionExpression.push(`attribute_not_exists(${safeKey})`)
+			return acc
+		}, { ConditionExpression:[], ExpressionAttributeNames:{} })
+
+		return { ConditionExpression: ConditionExpression.join(' AND '), ExpressionAttributeNames }
+	}
+}
+
+/**
+ * Inserts the entity.
+ * 
+ * @param {String} 			table
+ * @param {Object} 			entity					
+ * @param {String|[String]} options.ifNotExists		If set, then the insert fails when the record already exists. The value(s) define
+ *                                               	the hash or range key. If the table is set up with both, then both are required.
+ *                                     		
+ * @return {[type]}							
+ */
+const _insertEntity = ({ table, entity }, options) => new Promise((success, failure) => {
 	try {
+		const { ConditionExpression, ExpressionAttributeNames} = options && options.ifNotExists 
+			? _getConditionExpression(options.ifNotExists) 
+			: {}
 		const Item = escapeDates(entity)
 		getDB().put({
 			TableName: table,
+			ConditionExpression,
+			ExpressionAttributeNames,
 			Item
 		}, err => err ? failure(err) : success(Item))
 	} catch (err) {
@@ -415,17 +453,33 @@ const _insertEntity = ({ table, entity }) => new Promise((success, failure) => {
  */
 const _queryWithRetry = input => retry({
 	fn: () => _query(input),
-	retryOnFailure: err => err && (err.code == 'ProvisionedThroughputExceededException') || (err.code == 'UnknownEndpoint'),
+	retryOnFailure: err => {
+		const retryIfThisIsTrue = err && (err.code == 'ProvisionedThroughputExceededException') || (err.code == 'UnknownEndpoint')
+		return retryIfThisIsTrue
+	},
 	retryInterval: [500,2000],
 	retryAttempts: 10
-}).catch(err => { throw new Error(err.stack) })
+}).catch(err => { 
+	let e = new Error(err.stack) 
+	if (err.code)
+		e.code = err.code
+	throw e
+})
 
-const _insertEntityWithRetry = input => retry({
-	fn: () => _insertEntity(input),
-	retryOnFailure: err => err && (err.code == 'ProvisionedThroughputExceededException') || (err.code == 'UnknownEndpoint'),
+const _insertEntityWithRetry = (input, options) => retry({
+	fn: () => _insertEntity(input, options),
+	retryOnFailure: err => {
+		const retryIfThisIsTrue = err && (err.code == 'ProvisionedThroughputExceededException') || (err.code == 'UnknownEndpoint')
+		return retryIfThisIsTrue
+	},
 	retryInterval: [500,2000],
 	retryAttempts: 10
-}).catch(err => { throw new Error(err.stack) })
+}).catch(err => { 
+	let e = new Error(err.stack) 
+	if (err.code)
+		e.code = err.code
+	throw e
+})
 
 /**
  * Creates a Table object. 
@@ -483,11 +537,14 @@ const Table = function({ name, schema }) {
 	/**
 	 * Inserts a new object. 
 	 * 
-	 * @param {Object} 	 entity 
-	 * @param {Function} options.transform		Transforms the entity before inserting it. Useful to set the 'id' for example:
-	 *                                      		_insert({ businessId:1, name:'Hello' }, { keepId:true, transform:e => e.id = e.businessId })
-	 * @yield {Object}   newEntity				Same as 'entity' but with new 'id' (unless the 'options.keepId' was set to true and 
-	 *											the 'entity.id' already exists), 'created' and 'updated' properties.
+	 * @param {Object} 	 		entity 
+	 * @param {Function} 		options.transform		Transforms the entity before inserting it. Useful to set the 'id' for example:
+	 *                                      				_insert({ businessId:1, name:'Hello' }, { keepId:true, transform:e => e.id = e.businessId })
+	 * @param {String|[String]} options.ifNotExists		If set, then the insert fails when the record already exists. The value(s) define
+	 *                                               	the hash or range key. If the table is set up with both, then both are required.
+	 *                                     	
+	 * @yield {Object}   		newEntity				Same as 'entity' but with new 'id' (unless the 'options.keepId' was set to true and 
+	 *													the 'entity.id' already exists), 'created' and 'updated' properties.
 	 */
 	const _insert = (entity,options) => co(function *(){
 		const { transform } = options || {}
@@ -498,7 +555,7 @@ const Table = function({ name, schema }) {
 			yield Promise.resolve(null).then(() => transform(entity))
 
 		_validateEntityType(entity)
-		const newEntity = yield _insertEntityWithRetry({ table:getTableName(), entity })
+		const newEntity = yield _insertEntityWithRetry({ table:getTableName(), entity }, options)
 
 		return newEntity
 	})	
@@ -549,9 +606,12 @@ const Table = function({ name, schema }) {
 
 	/**
 	 * Inserts new objects. 
-	 * 
+	 * attribute_not_exists
 	 * @param {Object} entity 
 	 * @param {Number} options.concurrency	Default 1.
+	 * @param {Object} options.ifNotExists	Default false. If true, then the insert fails when the record already exists. If false,
+	 *                                     	the new record overwrites the old one.
+	 * 
 	 * @yield {Object} entity 
 	 */
 	this.insert = (entity,options) => co(function *(){
@@ -590,7 +650,7 @@ const Table = function({ name, schema }) {
 					// IMPORTANT: If there is a range key, 'key' MUST contain it. 'key' cannot just be made of the partition key.
 					whereKey: key => new Promise((success, failure) => {
 						if (!field)
-							throw new Error(`Missing required argument 'field'.`)
+							throw new Error('Missing required argument \'field\'.')
 						const v = value * 1
 						const table = getTableName()
 						if (isNaN(v))
