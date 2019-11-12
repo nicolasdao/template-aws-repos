@@ -15,14 +15,14 @@ provider:
   region: ap-southeast-2
 
 functions:
-  syncStresses:
-    handler: src/lambdas/sync_stresses.handler
+  firstFunc:
+    handler: index.handler
     events:
       - http:
-          path: /syncstresses
+          path: /firstFunc
           method: ANY
       - http:
-          path: /syncstresses/{any+}
+          path: /firstFunc/{any+}
           method: ANY
     iamRoleStatementsInherit: true
     iamRoleStatements:
@@ -31,15 +31,15 @@ functions:
           - lambda:InvokeFunction
         Resource: 
           Fn::GetAtt: 
-            - SyncLocationLambdaFunction
+            - secondFuncLambdaFunction
             - Arn
     environment:
       SYNC_LOCATION_LAMBDA:
         Fn::GetAtt: 
-            - SyncLocationLambdaFunction
+            - secondFuncLambdaFunction
             - Arn
-  syncLocation:
-    handler: src/lambdas/sync_location.handler
+  secondFunc:
+    handler: index.handler
 
 
 

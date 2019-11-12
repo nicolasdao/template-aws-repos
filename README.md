@@ -5,6 +5,8 @@ The __*AWS SDK Repos*__ project is a fork from the [https://github.com/nicolasda
 
 > * [Install](#install) 
 > * [Getting started](#getting-started)
+> * [Run locally](#run-locally)
+> * [Deployment](#deployment)
 > * [About Neap](#this-is-what-we-re-up-to)
 > * [License](#license)
 
@@ -19,46 +21,84 @@ npm start
 ```
 
 # Getting started
-## DynnamoDB
+## DynamoDB
 
 ```js
 const { my_table } = require('./src/repos')
 
-my_table
-	.insert({ device_id:1, timestamp:new Date(), data: { hello:'world' } })
+const now = new Date()
+
+my_table.insert({ device_id:1, timestamp: new Date(), hello:'world' })
+
+// Insert also supports arrays. Optionally, you can set the concurrency level for those inserts to match 
+// your provisioning set up (default is 1). 
+my_table.insert([
+	{ device_id:2, timestamp: now, hello:'Nic' },
+	{ device_id:3, timestamp: now, hello:'Carl' }
+], { concurrency:2 })
+
+// Check if a record already exists before inserting it. 
+// IMPORTANT: 'ifNotExists' can either be a string or an array of strings. If the table is set up with a hash and a range,
+// then this option must be an array with the names of those two keys, otherwise, it won't work. If there is no range key,
+// then both a string or an array with a single item will work.
+my_table.insert({ device_id:2, timestamp:now }, { ifNotExists:['device_id', 'timestamp'] })
+	.catch(err => {
+		if (err && err.code == 'ConditionalCheckFailedException')
+			return 'This message already exists.'
+		else
+			return err.message
+	})
 	.then(console.log)
 
 my_table
 	.query('device_id').eq(1)
 	.and('timestamp').between(['2019-08-01', '2019-08-02'])
 	.sortByRange('desc')
-	.limit(20) // use .limit(0) if you want to get all the data across all pages.
-	.execute()
-	.then(console.log)
-
-my_table
-	.query('device_id').eq(1)
-	.and('timestamp').between(['2019-08-01', '2019-08-02'])
-	.sortByRange('desc')
-	.cursor({ device_id:1, timestamp:'2019-08-01T10:00Z' }) // start from that key
 	.limit(20)
 	.execute()
-	.then(console.log)
+	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0 }
 
 my_table
 	.query('device_id').eq(1)
 	.and('timestamp').between(['2019-08-01', '2019-08-02'])
 	.first()
 	.execute()
-	.then(console.log)
+	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0 }
 
 my_table
 	.query('device_id').eq(1)
 	.and('timestamp').between(['2019-08-01', '2019-08-02'])
 	.last()
 	.execute()
-	.then(console.log)
+	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0 }
+
+// IMPORTANT: In the following 3 examples:
+//	- If there is a range key, 'key' MUST contain it. 'key' cannot just be made of the partition key.
+//	- The type of 'some_field' must be number.
+my_table.add(3).to('some_field').whereKey({ device_id:1, timestamp: '2019-10-29T03:04:33.579Z' }).then(console.log) // New value of some_field
+my_table.increment('some_field').whereKey({ device_id:1, timestamp: '2019-10-29T03:04:33.579Z' }).then(console.log) // some_field + 1
+my_table.decrement('some_field').whereKey({ device_id:1, timestamp: '2019-10-29T03:04:33.579Z' }).then(console.log) // some_field - 1
 ```
+
+# Run locally
+
+This template offers preconfigured npm scripts that cover the most common deployment types:
+
+| NPM Command | Command | Description |
+|:------------|:--------|:------------|
+| `npm run dev` | `TZ=UTC NODE_ENV=dev node-dev -r sls-config-parser/setenv index.js --inclcreds` | Set up all the enviornment variables defined in the `serverless.yml` and also include the AWS credentials associated to the AWS profile defined in the `serverless.yml` under `provider.profile` or in the `default` profile defined under `~/.aws/credentials`. Those credentials are necessary if you wish to call AWS APIs. |
+| `npm run prod` | `TZ=UTC NODE_ENV=dev node-dev -r sls-config-parser/setenv index.js --inclcreds --stage prod --force 'provider.profile=neap_prod;provider.region=ap-southeast-2'` | `--force ...` overrides specific properties in the `serverless.yml`. |
+
+
+# Deployment
+
+This template offers preconfigured npm scripts that cover the most common deployment types:
+
+| NPM Command | Command | Description |
+|:------------|:--------|:------------|
+| `npm run deploy:dev` | `sls deploy --stage dev` | Basic deploy using the `serverless CLI` tool. Because no profile is passed, it first tries to use the profile defined in the `serverless.yml` under `provider.profile`. It falls back on the `default` profile defined under `~/.aws/credentials` if the serverless.yml file does not specify a profile. |
+| `npm run deploy:prod` | `sls deploy --stage prod --aws-profile neap_prod --force` | Explicitely defines which `~/.aws/credentials` to use and forces the deployment (i.e., deploy even if no changes to the infrastructure are detected). |
+
 
 # This Is What We re Up To
 We are Neap, an Australian Technology consultancy powering the startup ecosystem in Sydney. We simply love building Tech and also meeting new people, so don't hesitate to connect with us at [https://neap.co](https://neap.co).
