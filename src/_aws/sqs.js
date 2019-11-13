@@ -18,7 +18,7 @@ const getSQS = () => {
 /**
  * Pushes a message to a queue.
  * 
- * @param  {String}			queue		Queue's ARN
+ * @param  {String}			queue		Queue's URL (if you're using CloudFormation, use 'Ref! YourQueueResource' to get that value)
  * @param  {String|Object}	body		The body can be anything, but eventually, it is stringified.
  *                               		(WARNING: Max size is 250KB)
  * @yield  {Object}			output		AWS SNS response
