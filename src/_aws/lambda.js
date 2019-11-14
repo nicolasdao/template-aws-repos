@@ -1,13 +1,5 @@
-/**
- * Copyright (c) 2017-2019, Neap Pty Ltd.
- * All rights reserved.
- * 
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree.
-*/
-
-const { co } = require('core-async')
-const { fetch } = require('../utils')
+const co = require('co')
+const { fetch, url: { buildUrl } } = require('../utils')
 
 let _lambda
 const getLambda = () => {
@@ -32,9 +24,24 @@ const invokeLambda = ({ name, body }) => new Promise((success, failure) => {
 	}
 })
 
+/**
+ * Invokes a Lambda. Example: invoke({ name:'arn:lambda...', body:{ path:'/hello', data: {} } })
+ * 
+ * @param {String}	name	Lambda's ARN or 'http://localhost...' if your testing locally
+ * @yield {Object}	body	Can be whatever, but if it uses this schema: { path:'/your/path', data:{ hello:'world' } }, then the
+ *        					'path' will be used to route the request to the right endpoint if you're using @neap/funky.
+ */
 const invoke = ({ name, body }) => co(function *(){
 	const isDev = /^http:\/\/localhost/.test(name)
-	return yield (isDev ? fetch.post({ uri:name, body:{ _awsParams:body } }) : invokeLambda({ name, body }))
+	if (isDev) {
+		const { path } = body || {}
+		const uri = buildUrl({ origin:name, pathname:path })
+		return yield fetch.post({ uri, body:{ _awsParams:body } })
+	} else
+		return yield invokeLambda({ name, body })
+}).catch(err => {
+	console.log(err.stack)
+	throw err
 })
 
 module.exports = {
