@@ -5,6 +5,8 @@ The __*AWS SDK Repos*__ project is a fork from the [https://github.com/nicolasda
 
 > * [Install](#install) 
 > * [Getting started](#getting-started)
+>	- [DynamoDB](#dynamodb)
+>	- [Invoking Lambda](#invoking-lambda)
 > * [Run locally](#run-locally)
 > * [Deployment](#deployment)
 > * [About Neap](#this-is-what-we-re-up-to)
@@ -78,6 +80,30 @@ my_table
 my_table.add(3).to('some_field').whereKey({ device_id:1, timestamp: '2019-10-29T03:04:33.579Z' }).then(console.log) // New value of some_field
 my_table.increment('some_field').whereKey({ device_id:1, timestamp: '2019-10-29T03:04:33.579Z' }).then(console.log) // some_field + 1
 my_table.decrement('some_field').whereKey({ device_id:1, timestamp: '2019-10-29T03:04:33.579Z' }).then(console.log) // some_field - 1
+```
+
+# Invoking Lambda
+
+```js
+const { app } = require('@neap/funky')
+const { co } = require('core-async')
+const { lambda } = require('.src/_aws')
+
+const THIS_LAMBDA_ARN = 'arn:lambda:....'
+
+app.all('/', (req,res) => co(function *() {
+	yield lambda.invoke({ name:THIS_LAMBDA_ARN, body:{ path:'/dosomething', data:{ hello:'world' } } })
+	return res.status(200).send('Message sent to other lambda.')
+}))
+
+
+app.all('/dosomething', (req,res) => {
+	const { data } = req.params._awsParams
+	console.log(data.hello)
+	return res.status(200).send('Message received.')
+})
+
+eval(app.listen({ port:3200, host:'aws' }))
 ```
 
 # Run locally
