@@ -3,6 +3,8 @@ const crypto = require('crypto')
 const { co, tools: { throttle } } = require('core-async')
 const { promise: { retry } } = require('../utils')
 
+const DELETE_CONCURRENCY = 10
+
 let _db
 const getDB = () => {
 	if (!_db) {
@@ -209,7 +211,7 @@ const _andOrSortLimitClauses = ({ whereClauses }, options) => ({
 	get clause() {
 		return whereClauses
 	},
-	execute: () => Promise.resolve(null).then(() => options && options.execute ? options.execute(whereClauses) : null)
+	execute: opts => Promise.resolve(null).then(() => options && options.execute ? options.execute(whereClauses, opts) : null)
 })
 
 /**
@@ -379,6 +381,27 @@ const _query = ({ table, where }) => new Promise((success, failure) => {
 	throw new Error(err.stack)
 })
 
+/**
+ * Deletes a single DynamoDB table record.
+ *
+ * @param  {String}  input.table			
+ * @param  {Object}  input.key		Primary key
+ * 
+ */
+const _delete = ({ table, key }) => new Promise((success, failure) => {	
+	try {
+		getDB().delete({ 
+			TableName: table,
+			Key: key
+		}, (err, data) => err ? failure(err): success(data))
+	} catch (err) {
+		failure(new Error(err.stack))
+	}
+}).catch(err => {
+	console.log(err.stack)
+	throw new Error(err.stack)
+})
+
 const _getConditionExpression = obj => {
 	if (!obj)
 		return
@@ -453,6 +476,28 @@ const _insertEntity = ({ table, entity }, options) => new Promise((success, fail
  */
 const _queryWithRetry = input => retry({
 	fn: () => _query(input),
+	retryOnFailure: err => {
+		const retryIfThisIsTrue = err && (err.code == 'ProvisionedThroughputExceededException') || (err.code == 'UnknownEndpoint')
+		return retryIfThisIsTrue
+	},
+	retryInterval: [500,2000],
+	retryAttempts: 10
+}).catch(err => { 
+	let e = new Error(err.stack) 
+	if (err.code)
+		e.code = err.code
+	throw e
+})
+
+/**
+ * Deletes a single DynamoDB table record.
+ *
+ * @param  {String}  input.table			
+ * @param  {Object}  input.key		Primary key
+ * 
+ */
+const _deleteWithRetry = input => retry({
+	fn: () => _delete(input),
 	retryOnFailure: err => {
 		const retryIfThisIsTrue = err && (err.code == 'ProvisionedThroughputExceededException') || (err.code == 'UnknownEndpoint')
 		return retryIfThisIsTrue
@@ -562,8 +607,96 @@ const Table = function({ name, schema }) {
 
 	this.where = _getWhereClause
 
+	this.deletePKs = (primaryKeys, options) => co(function *() {
+		const deleteTasks = primaryKeys.map(key => (() => _deleteWithRetry({ table: getTableName(), key })))
+		const concurrency = options && options.concurrency ? options.concurrency : DELETE_CONCURRENCY
+		yield throttle(deleteTasks, concurrency)
+	})
+
 	/**
-	 * Query a DynamoDB table.
+	 * Queries a DynamoDB table.
+	 *
+	 * @param  {String|Object}	field					e.g., 'device_id'	
+	 * @param  {String}			options.mode			Default 'read'. Valid values: 'read', 'delete'
+	 * @param  {Number}			options.concurrency		Default 10. Only meaningfull in 'delete' mode. It represents
+	 *                                         			the number of concurrent delete record.
+	 * 	
+	 */
+	this.query = (field, options) => {
+		const { mode } = options || {}
+
+		/**
+		 * Converts the query into a DynamoDB query and executes it.
+		 * 
+		 * @param {Array}	where						Array of objects similar to: 
+		 *                      	  					[ 
+		 *                      	     					{ field: 'device_id', op: 'eq', value: 1 }, 
+		 *                      	        				'and', 
+		 *                      		         			{ field: 'timestamp', op: 'between', value: [ '2019-08-01', '2019-08-02' ] } 
+		 *                                  			]
+		 * @param {Number}	opts.concurrency			Default 10. Only meaningfull in 'delete' mode. It represents
+		 *                                  			the number of concurrent delete record.
+		 * @yield {[Object]} output.Items				Array of records
+		 * @yield {Number} 	 output.Count				
+		 * @yield {Number} 	 output.ScannedCount
+		 * @yield {Object}   output.LastEvaluatedKey	
+		 */
+		const execute = (where, opts) => co(function *() {
+			const [key,,range] = where || []
+			const getData = where => co(function *(){
+				const data = yield _queryWithRetry({ table:getTableName(), where })
+				// Recursively call 'getData' to scan all the pages to get all the data
+				data.Items = data.Items || []
+				data.Count = data.Count || 0
+				data.ScannedCount = data.ScannedCount || 0
+				if (where.limit === 0 && data.LastEvaluatedKey && typeof(data.LastEvaluatedKey) == 'object') { // get all data
+					// Clone of 'where' into the '_where' so we can mutate 'cursor' without affecting 'where'
+					let _where = where.map(x => x)
+					const whereProps = Object.keys(where)
+					const extraProps = whereProps.slice(where.length - whereProps.length)
+					extraProps.forEach(prop => _where[prop] = where[prop])
+					// Update the 'cursor'
+					_where.cursor = data.LastEvaluatedKey
+
+					// Get the next batch of data and append it to the current one.
+					const tail = yield getData(_where)
+					data.Items.push(...tail.Items)
+					data.Count += tail.Count
+					data.ScannedCount += tail.ScannedCount
+					data.LastEvaluatedKey = tail.LastEvaluatedKey
+					return data
+				} else
+					return data
+			})
+
+			const output = yield getData(where)
+
+			if (mode != 'delete') 
+				return output
+
+			const partitionKey = (key || {}).field
+			const rangeKey = (range || {}).field
+
+			if (!output || !output.Items || !output.Items[0] || (!partitionKey && !rangeKey))
+				return 0
+
+			const primaryKeys = output.Items.map(i => {
+				let primaryKey = {}
+				if (partitionKey)
+					primaryKey[partitionKey] = i[partitionKey]
+				if (rangeKey)
+					primaryKey[rangeKey] = i[rangeKey]
+				return primaryKey
+			})
+
+			return yield _this.deletePKs(primaryKeys, opts)
+		})
+
+		return _getWhereClause(field, null, { execute })
+	}
+
+	/**
+	 * Deletes a DynamoDB table.
 	 *
 	 * @param  {String|Object}	field				e.g., 'name'	
 	 * 
@@ -572,37 +705,7 @@ const Table = function({ name, schema }) {
 	 * @yield {Number} 	 output.ScannedCount
 	 * @yield {Object}   output.LastEvaluatedKey	
 	 */
-	this.query = (field) => {
-		const execute = where => {
-			const getData = where => _queryWithRetry({ table:getTableName(), where })
-				.then(data => {
-					data.Items = data.Items || []
-					data.Count = data.Count || 0
-					data.ScannedCount = data.ScannedCount || 0
-					if (where.limit === 0 && data.LastEvaluatedKey && typeof(data.LastEvaluatedKey) == 'object') { // get all data
-						// Clone of 'where' into the '_where' so we can mutate 'cursor' without affecting 'where'
-						let _where = where.map(x => x)
-						const whereProps = Object.keys(where)
-						const extraProps = whereProps.slice(where.length - whereProps.length)
-						extraProps.forEach(prop => _where[prop] = where[prop])
-						// Update the 'cursor'
-						_where.cursor = data.LastEvaluatedKey
-
-						// Get the next batch of data and append it to the current one.
-						return getData(_where).then(tail => {
-							data.Items.push(...tail.Items)
-							data.Count += tail.Count
-							data.ScannedCount += tail.ScannedCount
-							data.LastEvaluatedKey = tail.LastEvaluatedKey
-							return data
-						})
-					} else
-						return data
-				})
-			return getData(where)
-		}
-		return _getWhereClause(field, null, { execute })
-	}
+	this.delete = field => this.query(field, { mode:'delete' })
 
 	/**
 	 * Inserts new objects. 

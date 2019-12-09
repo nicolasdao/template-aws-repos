@@ -74,6 +74,12 @@ my_table
 	.execute()
 	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0 }
 
+my_table
+	.delete('device_id').eq(1)
+	.and('timestamp').between(['2019-08-01', '2019-08-02'])
+	.execute()
+	.then(console.log)
+
 // IMPORTANT: In the following 3 examples:
 //	- If there is a range key, 'key' MUST contain it. 'key' cannot just be made of the partition key.
 //	- The type of 'some_field' must be number.
