@@ -76,25 +76,37 @@ const _formatAttr = attributes => {
  * @param  {String|Object}	payload.body					The body can be anything, but eventually, it is stringified.
  *                                        					(WARNING: Max size is 250KB)
  * @param  {Object}			payload.attributes				e.g., { 'your-attribute-name': 'whatever value' }
+ * @param  {String}			options.phone					E.164 format phone number (e.g., +61420496232)
  * 
  * @yield  {String}		output.ResponseMetadata.RequestId
  * @yield  {String}		output.MessageId	
  */
-const _send = (topicARN, { body, attributes }) => {
+const _send = (topicARN, payload, options) => {
+	const { phone:PhoneNumber } = options || {}
+	const { body, attributes } = typeof(payload) == 'string' ? { body:payload } : (payload || {})
 	const Message = typeof(body) == 'object' ? JSON.stringify(body) : `${body}`
 	const MessageAttributes = attributes 
 		? _formatAttr(attributes)
 		: undefined
 
-	return getSNS().publish({ 
+	let params = { 
 		Message, 
-		MessageAttributes,
-		TopicArn:topicARN 
-	}).promise()
+		MessageAttributes
+	}
+
+	if (PhoneNumber)
+		params.PhoneNumber = PhoneNumber
+	else
+		params.TopicArn = topicARN
+
+	return getSNS().publish(params).promise()
 }
 
 /**
- * Example: sns.topic('arn:2132132').send('Hello world')
+ * Example: 
+ * 	- sns.topic('arn:2132132').send('Hello world')
+ * 	- sns.topic('arn:2132132').send({ body:'Hello world', attributes: { hello:'world' } })
+ * 	- sns.topic('arn:2132132').send('Hello world', { phone:'+61420876543' })
  * 
  * @param  {String} 	topicARN 
  * @return {Function}   output.send 
@@ -117,7 +129,7 @@ const getTopic = topicARN => {
 		 * @yield  {String}		output.ResponseMetadata.RequestId
 		 * @yield  {String}		output.MessageId	
 		 */
-		send: payload => _send(topicARN, payload)
+		send: (payload, options) => _send(topicARN, payload, options)
 	}
 }
 
