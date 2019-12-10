@@ -44,7 +44,7 @@ const throwIfNotTruthy = (value, valueName, extraData) => {
 
 const throwIfNotNumber = (value, valueName, extraData) => {
 	const t = typeof(value)
-	if (t != 'number')
+	if (t != 'number' || isNaN(value))
 		throwError(`Wrong argument exception. ${valueName ? ` '${valueName}'` : 'The value'} must be a number (current: ${t}).`, extraData)
 	return value
 }
