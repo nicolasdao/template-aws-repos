@@ -1,4 +1,4 @@
-// v.0.0.2 - Last update 2019-09-24
+// v.0.0.3 - Last update 2019-12-12
 const crypto = require('crypto')
 const { co, tools: { throttle } } = require('core-async')
 const { promise: { retry } } = require('../utils')
@@ -231,7 +231,7 @@ const _createOp = ({ field, op, value, whereClauses }, options) => {
 
 /**
  * [description]
- * @param  {String|Object}	field			e.g., 'name'
+ * @param  {String|Object}	field			e.g., 'name'. If this is an object, see output of '_andOrSortLimitClauses' function
  * 		
  * @return {WhereClause}	output	
  * @return {Function}	
@@ -248,6 +248,9 @@ const _createOp = ({ field, op, value, whereClauses }, options) => {
  */
 const _getWhereClause = (field, whereClauses, options) => {
 	whereClauses = whereClauses || []
+	if (!field)
+		return _andOrSortLimitClauses({ whereClauses }, options)
+
 	const fieldType = _validateClauseField(field)
 	if (fieldType == 'string')
 		return {
@@ -364,15 +367,27 @@ const _query = ({ table, where }) => new Promise((success, failure) => {
 
 		const ScanIndexForward = !where.sortByRange ? undefined : where.sortByRange == 'asc' ? true : where.sortByRange == 'desc' ? false : undefined
 
-		getDB().query({ 
-			TableName: table,
-			KeyConditionExpression,
-			ExpressionAttributeNames,
-			ExpressionAttributeValues,
-			ExclusiveStartKey,
-			ScanIndexForward,
-			Limit
-		}, (err, data) => err ? failure(err): success(data))
+		// Decides between 'scan' and 'query'
+		if (!KeyConditionExpression || /^\s+(AND|OR)/.test(KeyConditionExpression))
+			getDB().scan({ 
+				TableName: table,
+				FilterExpression: !KeyConditionExpression ? null : KeyConditionExpression.replace(/^\s+(AND|OR)\s*/, ''),
+				ExpressionAttributeNames,
+				ExpressionAttributeValues,
+				ExclusiveStartKey,
+				ScanIndexForward,
+				Limit
+			}, (err, data) => err ? failure(err): success(data))
+		else
+			getDB().query({ 
+				TableName: table,
+				KeyConditionExpression,
+				ExpressionAttributeNames,
+				ExpressionAttributeValues,
+				ExclusiveStartKey,
+				ScanIndexForward,
+				Limit
+			}, (err, data) => err ? failure(err): success(data))
 	} catch (err) {
 		failure(new Error(err.stack))
 	}
