@@ -7,6 +7,7 @@ The __*AWS SDK Repos*__ project is a fork from the [https://github.com/nicolasda
 > * [Getting started](#getting-started)
 >	- [DynamoDB](#dynamodb)
 >	- [Invoking Lambda](#invoking-lambda)
+>	- [SNS](#sns)
 > * [Run locally](#run-locally)
 > * [Deployment](#deployment)
 > * [About Neap](#this-is-what-we-re-up-to)
@@ -74,6 +75,15 @@ my_table
 	.execute()
 	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0 }
 
+// This uses a DynamoDB SCAN instead of a QUERY (QUERY must be provided with a HASH key). With SCAN, you cannot:
+//	- Limit
+//	- Sort by
+my_table
+	.query()
+	.and('timestamp').gt('2019-08-01')
+	.execute()
+	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0 }
+
 my_table
 	.delete('device_id').eq(1)
 	.and('timestamp').between(['2019-08-01', '2019-08-02'])
@@ -110,6 +120,39 @@ app.all('/dosomething', (req,res) => {
 })
 
 eval(app.listen({ port:3200, host:'aws' }))
+```
+
+## SNS
+
+```js
+const { sns } = require('.src/_aws')
+
+// process.env.YOUR_TOPIC_ARN.
+// WARNING: To get a topic's ARN in the serverless.yml, use `!Ref` instead of the usual `GetAttr`.
+const topic = sns.topic(process.env.YOUR_TOPIC_ARN)
+
+topic.send('Hello world').then(console.log) // { ResponseMetadata: { RequestId: '123' }, MessageId: '173' }
+
+topic.send({ 
+	body:{ hello: 'world' },
+	attributes: {
+		'whatever-name': 'whatever value' // List of attributes at https://docs.aws.amazon.com/sns/latest/dg/sns-message-attributes.html#SNSMessageAttributes.DataTypes.
+	}
+}).then(console.log) // { ResponseMetadata: { RequestId: '123' }, MessageId: '173' }
+
+// Sends an SMS.
+// WARNING: 
+//	- You actually don't need to set up the topic ARN for this to work. Sending an SMS uses SNS' SMS capability which is unique to your AWS account.
+//	- SNS's SMS has MASSIVE limitations:
+//		1. You are limited to 1USD per month worth of SMSes sent!!! That will get you nowhere. To increase that limit contact AWS and describe your business case.
+//		2. Though you receive a response from the send API, it is useless. If you need to debug your messages, you have to configure CloudWatch.
+//
+// IMHO, use Twilio or any other SaaS to delive SMSes. AWS SNS for SMSes is dead easy to use, but quite frankly, not really usefull for production usage.
+topic.send('hello world', {
+	phone: '+61435765432', // Phone number in E.164 format.
+	subject: 'ALERT', // (Optional) limited to 11 characters.
+	type: 'transactional' // (Optional, default is 'promotional').
+}).then(console.log) // { ResponseMetadata: { RequestId: '123' }, MessageId: '173' }
 ```
 
 # Run locally
