@@ -6,6 +6,10 @@
  * LICENSE file in the root directory of this source tree.
 */
 
+// Usefull doc:
+// 	- Sending an SMS Message: https://docs.aws.amazon.com/sns/latest/dg/sms_publish-to-phone.html
+// 	- Amazon SNS Message Attributes: https://docs.aws.amazon.com/sns/latest/dg/sns-message-attributes.html#SNSMessageAttributes.DataTypes
+
 let _sns
 const getSNS = () => {
 	if (!_sns) {
@@ -77,27 +81,40 @@ const _formatAttr = attributes => {
  *                                        					(WARNING: Max size is 250KB)
  * @param  {Object}			payload.attributes				e.g., { 'your-attribute-name': 'whatever value' }
  * @param  {String}			options.phone					E.164 format phone number (e.g., +61420496232)
+ * @param  {String}			options.subject
+ * @param  {String}			options.type					Valid values: 'promotional' or 'transactional'
  * 
  * @yield  {String}		output.ResponseMetadata.RequestId
  * @yield  {String}		output.MessageId	
  */
 const _send = (topicARN, payload, options) => {
-	const { phone:PhoneNumber } = options || {}
+	const { phone, subject, type } = options || {}
 	const { body, attributes } = typeof(payload) == 'string' ? { body:payload } : (payload || {})
 	const Message = typeof(body) == 'object' ? JSON.stringify(body) : `${body}`
-	const MessageAttributes = attributes 
+	let MessageAttributes = attributes 
 		? _formatAttr(attributes)
-		: undefined
+		: {}
 
 	let params = { 
 		Message, 
 		MessageAttributes
 	}
 
-	if (PhoneNumber)
-		params.PhoneNumber = PhoneNumber
+	if (phone)
+		params.PhoneNumber = phone
 	else
 		params.TopicArn = topicARN
+
+	if (subject){
+		if (phone) {
+			const senderId = subject.replace(/\s*/g,'').substring(0,11)
+			MessageAttributes = { ...MessageAttributes, ..._formatAttr({ 'AWS.SNS.SMS.SenderID':senderId }) }
+		} else
+			params.Subject = subject
+	}
+
+	if ((type == 'promotional' || type == 'transactional') && phone) 
+		MessageAttributes = { ...MessageAttributes, ..._formatAttr({ 'AWS.SNS.SMS.SMSType':type == 'promotional' ? 'Promotional' : 'Transactional' }) }
 
 	return getSNS().publish(params).promise()
 }
