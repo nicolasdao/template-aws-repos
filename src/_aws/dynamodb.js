@@ -1,4 +1,4 @@
-// v.0.0.3 - Last update 2019-12-12
+// v.0.0.4 - Last update 2019-12-16
 const crypto = require('crypto')
 const { co, tools: { throttle } } = require('core-async')
 const { promise: { retry } } = require('../utils')
@@ -368,8 +368,13 @@ const _query = ({ table, where }) => new Promise((success, failure) => {
 		const ScanIndexForward = !where.sortByRange ? undefined : where.sortByRange == 'asc' ? true : where.sortByRange == 'desc' ? false : undefined
 
 		// Decides between 'scan' and 'query'
-		if (!KeyConditionExpression || /^\s+(AND|OR)/.test(KeyConditionExpression))
-			getDB().scan({ 
+		const useScan = 
+			!KeyConditionExpression || // no primary key condition
+			/^\s+(AND|OR)/.test(KeyConditionExpression) || // missing HASH key condition
+			(where && where[0] && where[0].op == 'ne') // the HASH key condition uses the non-equal operator
+
+		if (useScan) {
+			const params = { 
 				TableName: table,
 				FilterExpression: !KeyConditionExpression ? null : KeyConditionExpression.replace(/^\s+(AND|OR)\s*/, ''),
 				ExpressionAttributeNames,
@@ -377,9 +382,12 @@ const _query = ({ table, where }) => new Promise((success, failure) => {
 				ExclusiveStartKey,
 				ScanIndexForward,
 				Limit
-			}, (err, data) => err ? failure(err): success(data))
-		else
-			getDB().query({ 
+			}
+			// console.log(params)
+			// console.log('SCAN')
+			getDB().scan(params, (err, data) => err ? failure(err): success(data))
+		} else {
+			const params = { 
 				TableName: table,
 				KeyConditionExpression,
 				ExpressionAttributeNames,
@@ -387,7 +395,11 @@ const _query = ({ table, where }) => new Promise((success, failure) => {
 				ExclusiveStartKey,
 				ScanIndexForward,
 				Limit
-			}, (err, data) => err ? failure(err): success(data))
+			}
+			// console.log(params)
+			// console.log('QUERY')
+			getDB().query(params, (err, data) => err ? failure(err): success(data))
+		}
 	} catch (err) {
 		failure(new Error(err.stack))
 	}
