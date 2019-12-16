@@ -54,7 +54,7 @@ my_table.insert({ device_id:2, timestamp:now }, { ifNotExists:['device_id', 'tim
 	.then(console.log)
 
 my_table
-	.query('device_id').eq(1)
+	.query('device_id').eq(1) // supported operators: 'eq', 'ne', 'between', 'in', 'gt', 'lt', 'ge', 'le'
 	.and('timestamp').between(['2019-08-01', '2019-08-02'])
 	.sortByRange('desc')
 	.limit(20)
