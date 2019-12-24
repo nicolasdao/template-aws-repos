@@ -10,6 +10,7 @@ plugins:
 provider:
   name: aws
   runtime: nodejs10.x
+  memorySize: 512
   profile: your_profile
   stage: ${self:custom.stage}
   region: ap-southeast-2
