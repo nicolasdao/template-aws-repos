@@ -16,8 +16,20 @@ const { app } = require('@neap/funky')
 // aws.setCreds({ accessKeyId:'12334566', secretAccessKey:'12334566', region:'ap-southeast-2' })
 
 app.all('/', (req,res) => {
-	const payload = req.params._awsParams || { message: 'No AWS data' }
-	console.log(payload)
+	
+	// Use this snippet if the Lambda is triggered by an HTTP service (typically API Gateway)
+	const httpHeaders = req.headers
+	const httpPayload = req.params
+	console.log('HTTP HEADERS')
+	console.log(httpHeaders)
+	console.log('HTTP PAYLOAD')
+	console.log(httpPayload)
+	
+	// Use this snippet if the Lambda is triggered by a non-HTTP service (e.g., SNS, SQS)
+	const otherDataFromAnyAWSservice = req.params._awsParams || { message: 'No non-HTTP AWS service data' }
+	console.log('NON-HTTP PAYLOAD')
+	console.log(otherDataFromAnyAWSservice)
+	
 	return res.status(200).send('done')
 })
 
