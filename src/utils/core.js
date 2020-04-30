@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
 */
 
-// v0.0.3
+// v0.0.4
 
 const crypto = require('crypto')
 
@@ -658,6 +658,22 @@ const Timer = function() {
 	return this
 }
 
+/**
+ * Parses a date string with missing timezone to a UTC date object. 
+ * 
+ * @param  {String} str			e.g., '2020-04-29 05:00:09'
+ * @return {Date}	utcDate		e.g., 2020-04-29T05:00:09.000Z
+ */
+const parseToUTC = str => {
+	if (!str)
+		throw new Error(`String date 'str' is required.`)
+	if (typeof(str) != 'string')
+		throw new Error(`Expect string date 'str' to be a string, found ${typeof(str)} instead.`)
+	var date = new Date(str)
+	var userTimezoneOffset = date.getTimezoneOffset() * 60000;
+	return new Date(date.getTime() - userTimezoneOffset)
+}
+
 //////////////////////////                           END DATETIME HELPER                        ////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1111,7 +1127,8 @@ module.exports = {
 		addSeconds: addSecondsToDate,
 		toShort: convertDateToShortDateString,
 		parseShort: convertShortDateStringToDate,
-		Timer
+		Timer,
+		parseToUTC
 	},
 	identity: {
 		'new': newId
