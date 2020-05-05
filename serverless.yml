@@ -3,6 +3,7 @@ service: your-new-service
 
 custom:
   stage: ${opt:stage, 'dev'}
+  myTableName: my-table-name
 
 plugins:
   - serverless-iam-roles-per-function
@@ -27,20 +28,44 @@ functions:
           method: ANY
     iamRoleStatementsInherit: true
     iamRoleStatements:
-      - Effect: 'Allow'
-        Action:
-          - lambda:InvokeFunction
-        Resource: 
+      - Resource: 
           Fn::GetAtt: 
             - secondFuncLambdaFunction
             - Arn
+        Action:
+          - lambda:InvokeFunction
+        Effect: 'Allow'
+            
+      - Resource:
+          Fn::GetAtt:
+            - MyTable
+            - Arn
+        Action:
+          - dynamodb:Query
+          - dynamodb:GetItem
+          - dynamodb:PutItem 
+          - dynamodb:UpdateItem
+        Effect: Allow
     environment:
       SYNC_LOCATION_LAMBDA:
         Fn::GetAtt: 
             - secondFuncLambdaFunction
             - Arn
+      MY_TABLE_NAME: ${self:custom.myTableName}
   secondFunc:
     handler: index.handler
 
-
+resources:
+  Resources:
+    MyTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.myTableName}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
 
