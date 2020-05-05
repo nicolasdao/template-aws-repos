@@ -9,6 +9,8 @@
 const { assert } = require('chai')
 const { dynamodb: { _:{ mustBe, mustBeArrayOf, mustExist, convertToQueryParams, getWhereClause } } } = require('../src/_aws')
 
+// To skip a test, either use 'xit' instead of 'it', or 'describe.skip' instead of 'describe'
+
 describe('_aws.dynamodb._', () => {
 	describe('#mustExist', () => {
 		it('Should validate types', () => {
