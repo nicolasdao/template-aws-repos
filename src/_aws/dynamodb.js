@@ -92,7 +92,7 @@ const _checkRequired = ({ name, value }, options) => {
  * 
  * @param  {String}  name				
  * @param  {Object}  value				
- * @param  {String}  type				
+ * @param  {String}  type				Valid types are: All native JS types (e.g., 'string', 'number') + 'date' and 'id'
  * @param  {Boolean} options.required	Default false.
  * @return {Boolean}
  */
@@ -104,8 +104,9 @@ const _mustBe = ({ name, value, type }, options) => {
 	if (!type)
 		return true
 
-	const t = type == 'date' ? ((value instanceof Date || !isNaN(new Date(value))) ? 'date' : typeof(value)) : typeof(value)
-	if (t != type)
+	const t = type == 'date' ? (value instanceof Date || !isNaN(new Date(value)) ? 'date' : typeof(value)) : typeof(value)
+	const validType = (type == 'id' && (t == 'string' || t == 'number')) || t == type
+	if (!validType)
 		throw new Error(`Field '${name}' must be a ${type} (current: '${t}').`)
 	return true
 }
