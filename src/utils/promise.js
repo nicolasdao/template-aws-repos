@@ -286,15 +286,6 @@ const persistExecution = (execFn,options) => Promise.resolve(null).then(() => {
 	])
 })
 
-/**
- * Makes sure that a promise marshall the error instead of failing. 
- * 
- * @param  {Promise}	promise 
- * @return {[Error]}	result[0]	Array of potential errors. Null means no error
- * @return {Object}	result[1]	Result
- */
-const safeExec = promise => promise.then(data => ([null,data])).catch(err => ([[err],null]))
-
 module.exports = {
 	delay,
 	wait,
@@ -302,6 +293,5 @@ module.exports = {
 	makePromiseQueryable,
 	addTimeout,
 	runOnce,
-	persistExecution,
-	safeExec
+	persistExecution
 }
