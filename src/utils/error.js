@@ -126,6 +126,37 @@ const throwIfNotBetween = (value, valueName, validValues, extraData) => {
 		throwError(`Value for variable '${valueName}' is invalid. ${value} is not between ${validValues[0]} and ${validValues[1]}`, extraData)
 }
 
+/**
+ * Makes sure that a promise marshall the error instead of failing. 
+ * 
+ * @param  {Promise}	promise 
+ * @return {Error}		result[0]	Potential error. Null means no error
+ * @return {Object}		result[1]	Result
+ */
+const catchErrors = promise => promise
+	.then(data => ([null,data]))
+	.catch(err => {
+		if (err && err.errors && err.errors[0]) {
+			const errors = [err, ...err.errors]
+			err.errors = null
+			return [errors, null]
+		} else
+			return [[err],null]
+	})
+
+/**
+ * Create a new error that wraps others. 
+ * 
+ * @param  {String} msg		Error message.
+ * @param  {Array}  errors  Previous errors.
+ * @return {Error}	error
+ */
+const wrapErrors = (msg, errors=[]) => {
+	let error = new Error(msg)
+	error.errors = errors
+	return error
+}
+
 module.exports = {
 	throwError,
 	throwIfUndefined,
@@ -136,6 +167,8 @@ module.exports = {
 	throwIfGreaterThan,
 	throwIfNotBetween,
 	throwIfInvalidURL,
-	throwIfInvalidEmail
+	throwIfInvalidEmail,
+	catchErrors,
+	wrapErrors
 }
 
