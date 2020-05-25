@@ -128,13 +128,13 @@ const throwIfNotBetween = (value, valueName, validValues, extraData) => {
 
 /**
  * Makes sure that a promise marshall the error instead of failing.  How to use it:
- * 		const myAsyncFunction = catchErrors(async () => {
+ * 		const myAsyncFunction = () => catchErrors((async () => {
  * 			const [errors, data] = await otherAsyncFunc()
  * 			if (errors) 
  *				throw wrapErrors(`Boom! it broke for XYZ...`, errors)
  *
  *			return data
- * 		})
+ * 		})())
  * 
  * @param  {Promise}	promise 
  * @return {Error}		result[0]	Potential error. Null means no error
@@ -153,13 +153,13 @@ const catchErrors = promise => promise
 
 /**
  * Create a new error that wraps others. How to use it:
- * 		const myAsyncFunction = catchErrors(async () => {
+ * 		const myAsyncFunction = () => catchErrors((async () => {
  * 			const [errors, data] = await otherAsyncFunc()
  * 			if (errors) 
  *				throw wrapErrors(`Boom! it broke for XYZ...`, errors)
  *
  *			return data
- * 		})
+ * 		})())
  * 
  * @param  {String} msg		Error message.
  * @param  {Array}  errors  Previous errors.
