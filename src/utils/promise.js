@@ -11,9 +11,11 @@ const { obj: { merge }, identity, math } = require('./core')
 const TIMEOUT = 'RJDtm78=_timeout'
 
 /**
- * Create an empty promise that returns after a certain delay
+ * Create an empty promise that returns after a certain delay. This promise also contain an extra API called 'cancel' which allows to
+ * cancel the execution of that promise (e.g., p.cancel())
+ * 
  * @param  {Number|[Number]} timeout 	If array, it must contain 2 numbers representing an interval used to select a random number
- * @return {Promise}         			[description]
+ * @return {Promise}         			Cancellable promise
  */
 const delay = (timeout) => {
 	let tRef
