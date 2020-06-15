@@ -31,7 +31,7 @@
     "mocha": "^7.1.1",
     "node-dev": "^4.0.0",
     "serverless-iam-roles-per-function": "^2.0.2",
-    "standard-version": "^7.1.0"
+    "standard-version": "^8.0.0"
   },
   "dependencies": {
     "@neap/funky": "^0.6.3",
