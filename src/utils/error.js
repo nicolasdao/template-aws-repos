@@ -126,6 +126,15 @@ const throwIfNotBetween = (value, valueName, validValues, extraData) => {
 		throwError(`Value for variable '${valueName}' is invalid. ${value} is not between ${validValues[0]} and ${validValues[1]}`, extraData)
 }
 
+const _formatErrors = err => {
+	if (err && err.errors && err.errors[0]) {
+		const errors = [err, ...err.errors]
+		err.errors = null
+		return [errors, null]
+	} else
+		return [[err],null]
+}
+
 /**
  * Makes sure that a promise marshall the error instead of failing.  How to use it:
  * 		const myAsyncFunction = () => catchErrors((async () => {
