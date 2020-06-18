@@ -136,20 +136,39 @@ const throwIfNotBetween = (value, valueName, validValues, extraData) => {
  *			return data
  * 		})())
  * 
- * @param  {Promise}	promise 
- * @return {Error}		result[0]	Potential error. Null means no error
- * @return {Object}		result[1]	Result
+ * @param  {Promise|Function}	promise 
+ * @return {Error}				result[0]	Potential error. Null means no error
+ * @return {Object}				result[1]	Result
  */
-const catchErrors = promise => promise
-	.then(data => ([null,data]))
-	.catch(err => {
-		if (err && err.errors && err.errors[0]) {
-			const errors = [err, ...err.errors]
-			err.errors = null
-			return [errors, null]
-		} else
-			return [[err],null]
-	})
+const catchErrors = exec => {
+	if (!exec)
+		try {
+			throw new Error('Missing required argument \'exec\'.')
+		} catch (err) {
+			return _formatErrors(err)
+		} 
+
+	if (exec.then && typeof(exec.then) == 'function')
+		return exec
+			.then(data => ([null,data]))
+			.catch(_formatErrors)
+
+	const t = typeof(exec)
+	if (t == 'function') {
+		try {
+			const data = exec()
+			return [null, data]
+		} catch (err) {
+			return _formatErrors(err)
+		}
+	}
+
+	try {
+		throw new Error(`Invalid argument exception. Function 'catchErrors' expects a single argument of type 'Function' or 'Promise'. Found '${t}' instead.`)
+	} catch (err) {
+		return _formatErrors(err)
+	}
+}
 
 /**
  * Create a new error that wraps others. How to use it:
@@ -161,14 +180,22 @@ const catchErrors = promise => promise
  *			return data
  * 		})())
  * 
- * @param  {String} msg		Error message.
- * @param  {Array}  errors  Previous errors.
- * @return {Error}	error
+ * @param  {String}		msg				Error message.
+ * @param  {Array}		errors			Previous errors.
+ * @param  {Boolean}	options.merge	Default false. If true, all the errors details are merge into a the body of the new error.
+ * 
+ * @return {Error}		error
  */
-const wrapErrors = (msg, errors=[]) => {
-	let error = new Error(msg)
-	error.errors = errors
-	return error
+const wrapErrors = (msg, errors, options) => {
+	errors = errors || []
+	if (options && options.merge) {
+		const erroMsg = [{ stack:msg }, ...errors].map(e => e.stack).join('\n')
+		return new Error(erroMsg)
+	} else {
+		const error = new Error(msg)
+		error.errors = errors
+		return error
+	}
 }
 
 module.exports = {
