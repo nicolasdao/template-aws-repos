@@ -1,6 +1,6 @@
 {
   "name": "template-aws-repos",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Template containing repositories using AWS wrappers built on top of the AWS SDK.",
   "main": "index.js",
   "repository": {

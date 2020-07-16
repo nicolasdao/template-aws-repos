@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.1](https://github.com/nicolasdao/template-aws-repos/compare/v1.0.0...v1.0.1) (2020-07-16)
+
+
+### Bug Fixes
+
+* Vulnerabilities ([44bc4b5](https://github.com/nicolasdao/template-aws-repos/commit/44bc4b59e954c57b2f80ad6b9be8b3ee4dadaea2))
+* Vulnerabilities ([0a67ebe](https://github.com/nicolasdao/template-aws-repos/commit/0a67ebe8b3971274c751671848a40562e5e3eb3e))
+* Vulnerabilities due to standard-version ([4360daf](https://github.com/nicolasdao/template-aws-repos/commit/4360daf39b6e9ab12cc2ab5eaa3c2d8a8e54e840))
+
 ## [1.0.0](https://github.com/nicolasdao/template-aws-repos/compare/v0.0.2...v1.0.0) (2020-03-18)
 
 
