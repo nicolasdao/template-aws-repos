@@ -1,6 +1,6 @@
 // v.0.0.4 - Last update 2019-12-16
 const crypto = require('crypto')
-const { co, tools: { throttle } } = require('core-async')
+const { co, utils: { throttle } } = require('core-async')
 const { promise: { retry } } = require('../utils')
 
 const DELETE_CONCURRENCY = 10

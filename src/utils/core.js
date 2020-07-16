@@ -666,11 +666,11 @@ const Timer = function() {
  */
 const parseToUTC = str => {
 	if (!str)
-		throw new Error(`String date 'str' is required.`)
+		throw new Error('String date \'str\' is required.')
 	if (typeof(str) != 'string')
 		throw new Error(`Expect string date 'str' to be a string, found ${typeof(str)} instead.`)
 	var date = new Date(str)
-	var userTimezoneOffset = date.getTimezoneOffset() * 60000;
+	var userTimezoneOffset = date.getTimezoneOffset() * 60000
 	return new Date(date.getTime() - userTimezoneOffset)
 }
 

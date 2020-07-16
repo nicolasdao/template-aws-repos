@@ -67,6 +67,25 @@ const _processResponse = (res, uri, options={}) => {
 		.catch(() => ({ status: res.status, data: res, headers: res.headers }))
 }
 
+const _getBody = (headers, body) => {
+	const bodyType = typeof(body)
+	const nativeBody = !body || bodyType == 'string' || (body instanceof Buffer) || (body instanceof FormData) || (body instanceof URLSearchParams)
+	if (nativeBody)
+		return body
+
+	const contentType = !headers || typeof(headers) != 'object' 
+		? ''
+		: headers['Content-Type'] || headers['content-type'] || ''
+
+	if (`${contentType}`.toLowerCase().trim() == 'application/x-www-form-urlencoded' && bodyType == 'object') {
+		const params = new URLSearchParams()
+		for (let key in body)
+			params.append(key, body[key])
+		return params
+	} else 
+		return JSON.stringify(body)
+}
+
 /**
  * Performs HTTP request. Examples:
  *
@@ -85,7 +104,17 @@ const _processResponse = (res, uri, options={}) => {
  * 		}
  * 	})
  *	_fetch({ uri: 'https://example.com/somefile.pdf', streamReader:customStreamReader }, 'GET').then(() => console.log(Buffer.concat(chunks)))
- *  
+ *
+ *  // POSTING using 'application/x-www-form-urlencoded'
+ *  _fetch({ 
+ *  	uri: 'https://example.com/yourapi',
+ *  	headers: {
+ *  		'Content-Type': 'application/x-www-form-urlencoded'
+ *  	},
+ *  	body: {
+ *  		hello: 'world'
+ *  	}
+ *  }, 'POST').then(({ data }) => console.log(data)) // shows JSON object
  * 
  * @param  {String}			uri				e.g., 'https://example.com'
  * @param  {Object}			headers			e.g., { Authorization: 'bearer 12345' }
@@ -101,7 +130,7 @@ const _processResponse = (res, uri, options={}) => {
  * @yield {Object}   		output.headers
  */
 const _fetch = ({ uri, headers={}, body, streamReader, dst, parsing }, method) => {
-	const _body = !body || typeof(body) == 'string' || (body instanceof Buffer) || (body instanceof FormData) ? body : JSON.stringify(body)
+	const _body = _getBody(headers, body)
 	return fetch(uri, { method, headers, body:_body }).then(res => _processResponse(res, uri, { streamReader, dst, parsing }))
 }
 
