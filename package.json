@@ -34,7 +34,7 @@
     "standard-version": "^8.0.1"
   },
   "dependencies": {
-    "@neap/funky": "^0.6.6",
+    "@neap/funky": "^0.8.0",
     "aws-sdk": "^2.521.0",
     "core-async": "^2.0.4",
     "form-data": "^2.4.0",

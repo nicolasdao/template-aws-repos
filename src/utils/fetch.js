@@ -73,14 +73,24 @@ const _getBody = (headers, body) => {
 	if (nativeBody)
 		return body
 
-	const contentType = !headers || typeof(headers) != 'object' 
+	const contentType = (!headers || typeof(headers) != 'object' 
 		? ''
-		: headers['Content-Type'] || headers['content-type'] || ''
+		: headers['Content-Type'] || headers['content-type'] || '').toLowerCase().trim()
 
-	if (`${contentType}`.toLowerCase().trim() == 'application/x-www-form-urlencoded' && bodyType == 'object') {
-		const params = new URLSearchParams()
-		for (let key in body)
-			params.append(key, body[key])
+	// const multipart/form-data
+	const isUrlEncoded = contentType == 'application/x-www-form-urlencoded'
+	const isFormEncoded = contentType == 'multipart/form-data'
+	if ((isUrlEncoded || isFormEncoded) && bodyType == 'object') {
+		const params = isUrlEncoded ? new URLSearchParams() : new FormData()
+		for (let key in body) {
+			const value = body[key]
+			if (value !== null && value !== undefined) {
+				if (isFormEncoded && typeof(value) == 'object' && !(value instanceof Buffer))
+					params.append(key, Buffer.from(JSON.stringify(value)), { contentType:'application/json' })
+				else
+					params.append(key, value)
+			}
+		}
 		return params
 	} else 
 		return JSON.stringify(body)
