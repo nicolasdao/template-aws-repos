@@ -1049,6 +1049,65 @@ const getProperty = (obj,prop) => {
 	},obj)
 }
 
+/**
+ * Example: 
+ * const obj = extractFlattenedJSON({
+ * 	'user.firstName': 'Nicolas',
+ * 	'user.age': 38,
+ * 	'user.friends[0].name': 'Brendan',
+ * 	'user.friends[0].age': 31,
+ * 	'user.friends[1].name': 'Boris',
+ * 	'user.friends[1].age': 32
+ * }) -> 
+ * {
+ * 	user: {
+ * 		firstName: 'Nicolas',
+ * 		age: 38,
+ * 		friends: [{ name: 'Brendan', age: 31 }, { name: 'Boris', age: 32 }]
+ * 	}
+ * }
+ * 
+ * @param  {Object} obj
+ * @return {Object}    
+ */
+const extractFlattenedJSON = obj => {
+	obj = obj || {}
+	return Object.keys(obj).reduce((acc,key) => {
+		if (/\./.test(key)) {
+			const props = key.split('.')
+			const chainProp = (obj, props, val) => {
+				const [prop,...rest] = props
+				const arrayIdx = ((prop.match(/\[[0-9]*\]/) || [])[0] || 'no').replace(/[[\]]/g,'')*1
+				const isArray = !isNaN(arrayIdx)
+
+				if (isArray) {
+					const arrayName = prop.split('[')[0]
+					if (!obj[arrayName]) 
+						obj[arrayName] = []
+
+					if (rest.some(x => x)) {
+						if (!obj[arrayName][arrayIdx])
+							obj[arrayName][arrayIdx] = {}
+						chainProp(obj[arrayName][arrayIdx], rest, val)
+					}
+					else 
+						obj[arrayName][arrayIdx] = val
+				} else {
+					if (!obj[prop])
+						obj[prop] = {}
+					if (rest.some(x => x)) 
+						chainProp(obj[prop], rest, val)
+					else 
+						obj[prop] = val
+				}
+			}
+			chainProp(acc, props, obj[key])
+		} else
+			acc[key] = obj[key]
+		return acc
+	}, {})
+}
+
 //////////////////////////                         START OBJECT HELPERS                                 ////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1154,7 +1213,8 @@ module.exports = {
 		isEmpty: isEmptyObj,
 		isObj,
 		diff: getDiff,
-		same: objAreSame
+		same: objAreSame,
+		extractFlattenedJSON
 	},
 	validate: {
 		url: validateUrl,
