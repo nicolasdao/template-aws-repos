@@ -132,6 +132,8 @@ const buildUrl = uriInfo => {
 	} 
 	if (query && Object.keys(query).some(x => x))
 		querystring = _rebuildQueryString(query)
+	else
+		querystring = ''
 	
 	return joinUrlParts({ origin: _origin, pathname: _pathname, querystring, hash })
 }
