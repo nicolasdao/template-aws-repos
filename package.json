@@ -38,7 +38,7 @@
     "aws-sdk": "^2.521.0",
     "core-async": "^2.0.4",
     "form-data": "^2.4.0",
-    "node-fetch": "^2.3.0",
+    "node-fetch": "^2.6.1",
     "sls-config-parser": "^1.0.2"
   }
 }
