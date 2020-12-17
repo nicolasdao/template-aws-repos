@@ -31,14 +31,14 @@
     "mocha": "^7.1.1",
     "node-dev": "^4.0.0",
     "serverless-iam-roles-per-function": "^2.0.2",
-    "standard-version": "^8.0.1"
+    "standard-version": "^9.0.0"
   },
   "dependencies": {
     "@neap/funky": "^0.8.0",
     "aws-sdk": "^2.521.0",
     "core-async": "^2.0.4",
     "form-data": "^2.4.0",
-    "node-fetch": "^2.3.0",
+    "node-fetch": "^2.6.1",
     "sls-config-parser": "^1.0.2"
   }
 }
