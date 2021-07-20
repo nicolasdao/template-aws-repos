@@ -57,5 +57,7 @@ module.exports = {
 	sns: require('./sns'),
 	lambda: require('./lambda'),
 	apigateway: require('./apigateway'),
+	s3: require('./s3'),
+	codeCommit: require('./codeCommit'),
 	setCreds
 }
