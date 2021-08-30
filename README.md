@@ -59,21 +59,21 @@ my_table
 	.sortByRange('desc')
 	.limit(20)
 	.execute()
-	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0 }
+	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0, LastEvaluatedKey:{} }
 
 my_table
 	.query('device_id').eq(1)
 	.and('timestamp').between(['2019-08-01', '2019-08-02'])
 	.first()
 	.execute()
-	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0 }
+	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0, LastEvaluatedKey:{} }
 
 my_table
 	.query('device_id').eq(1)
 	.and('timestamp').between(['2019-08-01', '2019-08-02'])
 	.last()
 	.execute()
-	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0 }
+	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0, LastEvaluatedKey:{} }
 
 // This uses a DynamoDB SCAN instead of a QUERY (QUERY must be provided with a HASH key). With SCAN, you cannot:
 //	- Limit
@@ -82,7 +82,20 @@ my_table
 	.query()
 	.and('timestamp').gt('2019-08-01')
 	.execute()
-	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0 }
+	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0, LastEvaluatedKey:{} }
+
+// Scans the entire table ascending. Will only return the first 1MB. After, that you must use the 'LastEvaluatedKey' with the 'cursor' API.
+my_table
+	.query()
+	.execute()
+	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0, LastEvaluatedKey:{} }
+
+// Scans the entire table ascending. Will only return the first 1MB. After, that you must use the 'LastEvaluatedKey' with the 'cursor' API.
+my_table
+	.query()
+	.cursor(LastEvaluatedKey)
+	.execute()
+	.then(console.log) // { Items: [], Count: 0, ScannedCount: 0, LastEvaluatedKey:{} }
 
 my_table
 	.delete('device_id').eq(1)
