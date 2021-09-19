@@ -59,5 +59,6 @@ module.exports = {
 	apigateway: require('./apigateway'),
 	s3: require('./s3'),
 	codeCommit: require('./codeCommit'),
+	parameterStore: require('./parameterStore'),
 	setCreds
 }

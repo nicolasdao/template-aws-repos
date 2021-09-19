@@ -7,6 +7,7 @@ The __*AWS SDK Repos*__ project is a fork from the [https://github.com/nicolasda
 > * [Getting started](#getting-started)
 >	- [DynamoDB](#dynamodb)
 >	- [Invoking Lambda](#invoking-lambda)
+>	- [Parameter Store](#parameter-store)
 >	- [SNS](#sns)
 > * [Run locally](#run-locally)
 > * [Deployment](#deployment)
@@ -133,6 +134,18 @@ app.all('/dosomething', (req,res) => {
 })
 
 eval(app.listen({ port:3200, host:'aws' }))
+```
+
+## Parameter Store
+
+```js
+const { parameterStore } = require('.src/_aws')
+
+parameterStore.get({
+	name: 'my-parameter-store-name',
+	version: 2, // Optional. If not defined, the latest version is used.
+	json: true // Optional. Default false.
+})then(({ Value }) => console.log(Value))
 ```
 
 ## SNS
