@@ -2,6 +2,7 @@ const { error:{ catchErrors, wrapErrors } } = require('puffy')
 const AWS = require('aws-sdk')
 const ssm = new AWS.SSM({apiVersion: '2014-11-06'})
 
+// Doc: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/SSM.html#getParameter-property
 const ssmGetParameter = arg => new Promise(next => ssm.getParameter(arg, (err,data) => next(err ? [[err],null] : [null,data])))
 
 /**
