@@ -145,7 +145,22 @@ parameterStore.get({
 	name: 'my-parameter-store-name',
 	version: 2, // Optional. If not defined, the latest version is used.
 	json: true // Optional. Default false.
-})then(({ Value }) => console.log(Value))
+}).then(({ Value }) => console.log(Value))
+```
+
+To use this API, the following policy must be attached to the hosting environmnet's IAM role:
+
+```js
+{
+	Version: '2012-10-17',
+	Statement: [{
+		Action: [
+			'ssm:GetParameter'
+		],
+		Resource: '*',
+		Effect: 'Allow'
+	}]
+}
 ```
 
 ## SNS
