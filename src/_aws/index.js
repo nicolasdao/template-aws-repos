@@ -60,5 +60,6 @@ module.exports = {
 	s3: require('./s3'),
 	codeCommit: require('./codeCommit'),
 	parameterStore: require('./parameterStore'),
+	stepFunction: require('./stepFunction'),
 	setCreds
 }

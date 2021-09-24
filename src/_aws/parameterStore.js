@@ -8,6 +8,8 @@ const ssmGetParameter = arg => new Promise(next => ssm.getParameter(arg, (err,da
 /**
  * Gets a parameter from AWS Parameter Store.
  * 
+ * WARNING: Requires the 'ssm:GetParameter' permission in the policy.
+ * 
  * @param  {String}  name
  * @param  {String}  version						Optional. If null, then the latest version is returned.	
  * @param  {Boolean} json							Default false. True means the Value is parsed to JSON.

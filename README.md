@@ -112,7 +112,7 @@ my_table.increment('some_field').whereKey({ device_id:1, timestamp: '2019-10-29T
 my_table.decrement('some_field').whereKey({ device_id:1, timestamp: '2019-10-29T03:04:33.579Z' }).then(console.log) // some_field - 1
 ```
 
-# Invoking Lambda
+## Invoking Lambda
 
 ```js
 const { app } = require('@neap/funky')
@@ -145,7 +145,7 @@ parameterStore.get({
 	name: 'my-parameter-store-name',
 	version: 2, // Optional. If not defined, the latest version is used.
 	json: true // Optional. Default false.
-}).then(({ Value }) => console.log(Value))
+}).then(([errors, { Value }]) => console.log(Value))
 ```
 
 To use this API, the following policy must be attached to the hosting environmnet's IAM role:
@@ -194,6 +194,41 @@ topic.send('hello world', {
 	subject: 'ALERT', // (Optional) limited to 11 characters.
 	type: 'transactional' // (Optional, default is 'promotional').
 }).then(console.log) // { ResponseMetadata: { RequestId: '123' }, MessageId: '173' }
+```
+
+## Step-function
+
+```js
+const { stepFunction } = require('.src/_aws')
+
+stepFunction.startExecution({ 
+	arn:'arn:aws:states:ap-southeast-2:1234:stateMachine:my-step-function-name',
+	// name: 'dewd', // Optional name used for idempotence. Must be unique.
+	input: {
+		some: 'value'
+	}
+}).then(([errors]) => console.log(errors))
+
+parameterStore.get({
+	name: 'my-parameter-store-name',
+	version: 2, // Optional. If not defined, the latest version is used.
+	json: true // Optional. Default false.
+}).then(([errors, { Value }]) => console.log(Value))
+```
+
+To use this API, the following policy must be attached to the hosting environmnet's IAM role:
+
+```js
+{
+	Version: '2012-10-17',
+	Statement: [{
+		Action: [
+			'ssm:GetParameter'
+		],
+		Resource: '*',
+		Effect: 'Allow'
+	}]
+}
 ```
 
 # Run locally
