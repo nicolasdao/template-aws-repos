@@ -115,25 +115,23 @@ my_table.decrement('some_field').whereKey({ device_id:1, timestamp: '2019-10-29T
 ## Invoking Lambda
 
 ```js
-const { app } = require('@neap/funky')
-const { co } = require('core-async')
-const { lambda } = require('.src/_aws')
+const lambda = require('./aws/lambda')
 
-const THIS_LAMBDA_ARN = 'arn:lambda:....'
+const main = async () => {
+	const [lambdaErrors, lambdaData] = await lambda.invoke({
+		arn: process.env.LAMBDA_CREATE_S3_ARN,
+		body: {
+			project_id
+		},
+		async: false // Default false. True means fire and forget. Only StatusCode is returned.
+		json:true //  Default false.  True means the 'lambdaData.Payload' which is a string is parsed to JSON.
+	})
 
-app.all('/', (req,res) => co(function *() {
-	yield lambda.invoke({ name:THIS_LAMBDA_ARN, body:{ path:'/dosomething', data:{ hello:'world' } } })
-	return res.status(200).send('Message sent to other lambda.')
-}))
+	console.log(lambdaData.StatusCode)
+	console.log(lambdaData.Payload)
+}
 
-
-app.all('/dosomething', (req,res) => {
-	const { data } = req.params._awsParams
-	console.log(data.hello)
-	return res.status(200).send('Message received.')
-})
-
-eval(app.listen({ port:3200, host:'aws' }))
+main()
 ```
 
 ## Parameter Store
