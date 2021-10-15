@@ -4,11 +4,24 @@ The __*AWS SDK Repos*__ project is a fork from the [https://github.com/nicolasda
 # Table of Contents
 
 > * [Install](#install) 
-> * [Getting started](#getting-started)
+> * [APIs](#apis)
+>	- [Cloudfront](#cloudfront)
+>		- [Cloudfront distribution with S3 static website bucket](#cloudfront-distribution-with-s3-static-website-bucket)
+>		- [Cloudfront distribution with private S3 bucket ](#cloudfront-distribution-with-private-s3-bucket)
 >	- [DynamoDB](#dynamodb)
 >	- [Invoking Lambda](#invoking-lambda)
 >	- [Parameter Store](#parameter-store)
+>	- [Resource](#resource)
+>	- [S3](#s3)
+>		- [`s3.bucket.exists`](#s3bucketexists)
+>		- [`s3.bucket.list`](#s3bucketlist)
+>		- [`s3.bucket.get`](#s3bucketget)
+>		- [`s3.bucket.setWebsite`](#s3bucketsetWebsite)
+>		- [`s3.bucket.files.upload`](#s3bucketfilesupload)
+>		- [`s3.bucket.files.sync`](#s3bucketfilessync)
+>		- [`s3.bucket.files.remove`](#s3bucketfilesremove)
 >	- [SNS](#sns)
+>	- [Step-function](#step-function)
 > * [Run locally](#run-locally)
 > * [Deployment](#deployment)
 > * [About Neap](#this-is-what-we-re-up-to)
@@ -24,7 +37,112 @@ npm test
 npm start
 ```
 
-# Getting started
+# APIs
+## Cloudfront
+
+The next sample is a bit long but necessary to understand the context in which a Cloufront distribution can be created. This option below show a bucket set up as a website. This is the easiest setup. The other setup is a [private S3 bucket set up with OAI](#cloudfront-distribution-with-private-s3-bucket) (i.e., Origin Access Identity).
+
+### Cloudfront distribution with S3 static website bucket
+
+The 2 APIs in the code below are:
+- `cloudfront.distribution.exists`
+- `cloudfront.distribution.create`
+
+Notcice that the only way to use `cloudfront.distribution.exists` with another predicate than the Cloudfront distribution ID is with tagging. This means that the distro MUST be tagged. 
+
+```js
+const { error: { catchErrors, wrapErrors, mergeErrors } } = require('puffy')
+const { join } = require('path')
+const { s3, cloudfront, resource } = require('./src/_aws')
+
+const BUCKET = 'nic-today-20211015'
+const DISTRO = `${BUCKET}-distro`
+const REGION = 'ap-southeast-2'
+
+const main = () => catchErrors((async () => {
+	// 1.Making sure the bucket exists
+	if (!(await s3.bucket.exists(BUCKET))) {
+		console.log(`Creating bucket '${BUCKET}'...`)
+		const [createErrors, newBucket] = await s3.bucket.create({ 
+			name: BUCKET, 
+			acl: 'public-read',  // Default 'private'
+			region: REGION, // default: 'us-east-1' 
+			tags: { 
+				Project:'Demo', 
+				Env:'Dev' 
+			}
+		})
+
+		if (createErrors)
+			throw wrapErrors(`Bucket creation failed`, createErrors)
+
+		console.log(`Bucket '${BUCKET}' successfully created.`)
+	} else
+		console.log(`Bucket '${BUCKET}' already exists.`)
+
+	const [getErrors, bucketDetails] = await s3.bucket.get(BUCKET, { website:true })
+	if (getErrors)
+		throw wrapErrors(`Bucket info failed`, getErrors)
+
+	// 2. Making sure the website is set as a website
+	if (!bucketDetails.website) {
+		console.log(`Setting bucket '${BUCKET}' to website`)
+		const [websiteErrors] = await s3.bucket.setWebsite({ bucket:BUCKET })
+		if (websiteErrors)
+			throw wrapErrors(`Failed to set bucket as website`, websiteErrors)
+	} else
+		console.log(`Bucket '${BUCKET}' already set to website`)
+
+	// 3. Uploading files to the bucket
+	const [syncErrors] = await s3.bucket.files.sync({
+		bucket: BUCKET, 
+		dir: join(__dirname, './demo'), 
+		noWarning: true
+	})
+
+	if (syncErrors)
+		throw wrapErrors(`Synching files failed`, syncErrors)
+
+	// 4. Adding a cloudfront distro on the bucket
+	const [distroExistsErrors, distroExists] = await cloudfront.distribution.exists({ 
+		tags: { Name:DISTRO }
+	})
+	if (distroExistsErrors)
+		throw wrapErrors(`Failed to confirm whether the distro exists or not`, distroExistsErrors)
+
+	if (!distroExists) {
+		console.log(`Creating new distro tagged 'Name:${DISTRO}' for bucket '${BUCKET}'`)
+		const [distroErrors, distro] = await cloudfront.distribution.create({
+			name: DISTRO,
+			domain: bucketDetails.bucketRegionalDomainName,
+			operationId: DISTRO, 
+			enabled: true,
+			tags: { 
+				Project:'Demo', 
+				Env:'Dev',
+				Name: DISTRO
+			}
+		})
+
+		if (distroErrors)
+			throw wrapErrors(`Distro creation failed`, distroErrors)
+
+		console.log(`Distro successfully created`)
+		console.log(distro)
+	} else
+		console.log(`Distro tagged 'Name:${DISTRO}' already exist`)
+})())
+
+main().then(([errors]) => {
+	if (errors)
+		console.error(mergeErrors(errors).stack)
+	else
+		console.log('All good')
+})
+```
+
+### Cloudfront distribution with private S3 bucket 
+
 ## DynamoDB
 
 ```js
@@ -159,6 +277,255 @@ To use this API, the following policy must be attached to the hosting environmne
 		Effect: 'Allow'
 	}]
 }
+```
+
+## Resource
+
+> __WARNING__: Certain AWS services are global (e.g., 'cloudfront'), which means their region is 'us-east-1'. 		
+
+```js
+const { error: { catchErrors, mergeErrors } } = require('puffy')
+const { resource } = require('.src/_aws')
+
+const main = () => catchErrors((async () => {
+	const [resourceErrors, resources] = await resource.getByTags({ 
+		tags: { // required
+			Name:'my-resource-name' 
+		}, 
+		region: 'us-east-1', // required
+		types: ['cloudfront:distribution'] // optional
+	})
+	if (resourceErrors)
+		throw wrapErrors(`Failed to get resource by tag`, resourceErrors)
+
+	console.log(resources)
+	// {
+	// 	paginationToken: '',
+	// 	resources:[{
+	// 		arn: 'arn:aws:cloudfront::1234567:distribution/SHWHSW3213',
+	// 		tags: {
+	// 			Name:'my-resource-name'
+	// 		}
+	// 	}]
+	// }
+})())
+
+main().then(([errors]) => {
+	if (errors)
+		console.error(mergeErrors(errors).stack)
+	else
+		console.log('All good')
+})
+```
+
+## S3
+### `s3.bucket.exists`
+
+```js
+const { error: { catchErrors, mergeErrors } } = require('puffy')
+const { s3 } = require('.src/_aws')
+
+const main = () => catchErrors((async () => {
+	const bucketName = 'some-bucket-name'
+	const bucketExists = await s3.bucket.exists(bucketName)
+	console.log(`Bucket '${bucketName} ${bucketExists ? ' ' : 'does not '}exist'`)
+})())
+
+main().then(([errors]) => {
+	if (errors)
+		console.error(mergeErrors(errors).stack)
+	else
+		console.log('All good')
+})
+```
+
+### `s3.bucket.list`
+
+```js
+const { error: { catchErrors, wrapErrors, mergeErrors } } = require('puffy')
+const { s3 } = require('.src/_aws')
+
+const main = () => catchErrors((async () => {
+	const [errors, bucketList] = await s3.bucket.list()
+	if (errors)
+		throw wrapErrors('Failed to list buckets', errors)
+	else {
+		console.log(`Found ${bucketList.buckets.length} buckets.`)
+		console.log(bucketList.owner)
+		if (bucketList.buckets.length) {
+			console.log('First bucket')
+			console.log(bucketList.buckets[0].name)
+			console.log(bucketList.buckets[0].creationDate)
+		}
+	}
+})())
+
+main().then(([errors]) => {
+	if (errors)
+		console.error(mergeErrors(errors).stack)
+	else
+		console.log('All good')
+})
+```
+
+### `s3.bucket.get`
+
+```js
+const { error: { catchErrors, wrapErrors, mergeErrors } } = require('puffy')
+const { s3 } = require('.src/_aws')
+
+const main = () => catchErrors((async () => {
+	const bucketName = 'some-bucket-name'
+	const [errors, bucket] = await s3.bucket.get(bucketName, { website:true })
+	if (errors)
+		throw wrapErrors('Failed to get bucket', errors)
+	else {
+		console.log(bucket)
+		// {
+		// 		region: 'ap-southeast-2',
+		// 		location: 'http://some-bucket-name.s3.amazonaws.com/'
+		// 		regionalLocation: 'http://some-bucket-name.s3.ap-southeast-2.amazonaws.com/',
+		// 		bucketDomainName: 'some-bucket-name.s3.amazonaws.com'
+		// 		bucketRegionalDomainName: 'some-bucket-name.s3.ap-southeast-2.amazonaws.com',
+		// 		website: true, // Only with 'options.website:true'
+		// 		websiteEndpoint: 'http://some-bucket-name.s3-website-ap-southeast-2.amazonaws.com' // Only with 'options.website:true'
+		// }
+	}
+}
+})())
+
+main().then(([errors]) => {
+	if (errors)
+		console.error(mergeErrors(errors).stack)
+	else
+		console.log('All good')
+})
+```
+
+### `s3.bucket.setWebsite`
+
+```js
+const { error: { catchErrors, wrapErrors, mergeErrors } } = require('puffy')
+const { s3 } = require('.src/_aws')
+
+const main = () => catchErrors((async () => {
+	const bucketName = 'some-bucket-name'
+	const [errors] = await s3.bucket.setWebsite({ 
+		bucket: bucketName, 
+		index: 'home.html', // default 'index.html'
+		error: 'error.html'
+	})
+	if (errors)
+		throw wrapErrors('Failed to get bucket', errors)
+	else {
+		console.log(`Bucket set as website`)
+	}
+}
+})())
+
+main().then(([errors]) => {
+	if (errors)
+		console.error(mergeErrors(errors).stack)
+	else
+		console.log('All good')
+})
+```
+
+### `s3.bucket.files.upload`
+
+```js
+const { error: { catchErrors, wrapErrors, mergeErrors } } = require('puffy')
+const { join } = require('path')
+const { s3 } = require('.src/_aws')
+
+const main = () => catchErrors((async () => {
+	const [uploadErrors, filesInDir] = await s3.bucket.files.upload({ 
+		bucket: 'my-super-bucket', 
+		dir: join(__dirname, './app'), 
+		ignore: '**/node_modules/**', 
+		ignoreObjects:[{ key:'src/bundle.js', hash:'123456' }], // If 'src/bundle.js' has not changed (i.e., its hash is the same), then don't upload it
+		noWarning: true
+	})
+	if (uploadErrors)
+		throw wrapErrors('Failed to upload files to bucket', uploadErrors)
+	else {
+		console.log(`${filesInDir.length} files in directory`)
+		console.log(filesInDir[0].key)
+		console.log(filesInDir[0].hash)
+	}
+}
+})())
+
+main().then(([errors]) => {
+	if (errors)
+		console.error(mergeErrors(errors).stack)
+	else
+		console.log('All good')
+})
+```
+
+### `s3.bucket.files.sync`
+
+Does the same as 'upload' but with the ability to delete files that have been removed locally.
+
+```js
+const { error: { catchErrors, wrapErrors, mergeErrors } } = require('puffy')
+const { join } = require('path')
+const { s3 } = require('.src/_aws')
+
+const main = () => catchErrors((async () => {
+	const [syncErrors, filesInDir] = await s3.bucket.files.sync({ 
+		bucket: 'my-super-bucket', 
+		dir: join(__dirname, './app'), 
+		ignore: '**/node_modules/**', 
+		ignoreObjects:[{ key:'src/bundle.js', hash:'123456' }], // If 'src/bundle.js' has not changed (i.e., its hash is the same), then don't upload it
+		noWarning: true
+	})
+	if (syncErrors)
+		throw wrapErrors('Failed to sync files to bucket', syncErrors)
+	else {
+		console.log(`${filesInDir.length} files in directory`)
+		console.log(filesInDir[0].key)
+		console.log(filesInDir[0].hash)
+	}
+}
+})())
+
+main().then(([errors]) => {
+	if (errors)
+		console.error(mergeErrors(errors).stack)
+	else
+		console.log('All good')
+})
+```
+
+### `s3.bucket.files.remove`
+
+```js
+const { error: { catchErrors, wrapErrors, mergeErrors } } = require('puffy')
+const { s3 } = require('.src/_aws')
+
+const main = () => catchErrors((async () => {
+	const [rmErrors] = await s3.bucket.files.remove({ 
+		bucket: 'my-super-bucket', 
+		keys:[
+			'src/bundle.js',
+			'src/bundle.map.js'
+		]
+	})
+	if (rmErrors)
+		throw wrapErrors('Failed to remove files from bucket', rmErrors)
+	else
+		console.log(`Files removed`)
+}
+})())
+
+main().then(([errors]) => {
+	if (errors)
+		console.error(mergeErrors(errors).stack)
+	else
+		console.log('All good')
+})
 ```
 
 ## SNS

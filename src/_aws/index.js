@@ -52,14 +52,16 @@ const setCreds = ({ accessKeyId, secretAccessKey, region }) => {
 }
 
 module.exports = {
-	dynamodb: require('./dynamodb'),
-	sqs: require('./sqs'),
-	sns: require('./sns'),
-	lambda: require('./lambda'),
 	apigateway: require('./apigateway'),
-	s3: require('./s3'),
+	cloudfront: require('./cloudfront'),
 	codeCommit: require('./codeCommit'),
+	dynamodb: require('./dynamodb'),
+	lambda: require('./lambda'),
 	parameterStore: require('./parameterStore'),
-	stepFunction: require('./stepFunction'),
-	setCreds
+	resource: require('./resource'),
+	s3: require('./s3'),
+	setCreds,
+	sns: require('./sns'),
+	sqs: require('./sqs'),
+	stepFunction: require('./stepFunction')
 }
