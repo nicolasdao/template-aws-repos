@@ -10,8 +10,7 @@ The __*AWS SDK Repos*__ project is a fork from the [https://github.com/nicolasda
 >		- [`cloudfront.distribution.select` and `cloudfront.distribution.find`](#cloudfrontdistributionselect-and-cloudfrontdistributionfind`)
 >		- [`cloudfront.distribution.create`](#cloudfrontdistributioncreate)
 >		- [`cloudfront.distribution.invalidate`](#cloudfrontdistributioninvalidate)
->		- [Cloudfront distribution with S3 static website bucket](#cloudfront-distribution-with-s3-static-website-bucket)
->		- [Cloudfront distribution with private S3 bucket ](#cloudfront-distribution-with-private-s3-bucket)
+>		- [`cloudfront.distribution.update`](#cloudfrontdistributionupdate)
 >	- [DynamoDB](#dynamodb)
 >	- [Invoking Lambda](#invoking-lambda)
 >	- [Parameter Store](#parameter-store)
@@ -28,8 +27,10 @@ The __*AWS SDK Repos*__ project is a fork from the [https://github.com/nicolasda
 >	- [Step-function](#step-function)
 > * [Run locally](#run-locally)
 > * [Deployment](#deployment)
-> * [About Neap](#this-is-what-we-re-up-to)
 > * [License](#license)
+> * [Annexes](#annexes)
+>	- [Cloudfront distribution with S3 static website bucket](#cloudfront-distribution-with-s3-static-website-bucket)
+>	- [Cloudfront distribution with private S3 bucket ](#cloudfront-distribution-with-private-s3-bucket)
 
 
 # Install
@@ -43,6 +44,10 @@ npm start
 
 # APIs
 ## Cloudfront
+
+For concrete examples, please refer to the [Annexes](#annexes):
+- [Cloudfront distribution with S3 static website bucket](#cloudfront-distribution-with-s3-static-website-bucket)
+- [Cloudfront distribution with private S3 bucket ](#cloudfront-distribution-with-private-s3-bucket)
 
 ### `cloudfront.distribution.exists`
 
@@ -97,7 +102,13 @@ const main = () => catchErrors((async () => {
 		// 	domainName: 'dyoumeptyjf92.cloudfront.net',
 		// 	status: 'InProgress',
 		// 	lastUpdate: 2021-10-15T08:40:11.908Z,
-		// 	eTag: 'E1AQWRQF1J4O48'	
+		// 	eTag: 'E1AQWRQF1J4O48',
+		// 	origin: {
+		// 		domain: 'nic-today-20211015.s3.ap-southeast-2.amazonaws.com',
+		// 		type: 's3'
+		// 	},
+		// 	aliases: [],
+		// 	enabled: true
 		// }
 	else
 		console.log(`Distro not found`)
@@ -116,7 +127,13 @@ const main = () => catchErrors((async () => {
 		// 	domainName: 'dyoumeptyjf92.cloudfront.net',
 		// 	status: 'InProgress',
 		// 	lastUpdate: 2021-10-15T08:40:11.908Z,
-		// 	eTag: 'E1AQWRQF1J4O48'	
+		// 	eTag: 'E1AQWRQF1J4O48',
+		// 	origin: {
+		// 		domain: 'nic-today-20211015.s3.ap-southeast-2.amazonaws.com',
+		// 		type: 's3'
+		// 	},
+		// 	aliases: [],
+		// 	enabled: true
 		// }
 	else
 		console.log(`Distro not found`)
@@ -185,106 +202,33 @@ const main = () => catchErrors((async () => {
 	// }
 ```
 
-### Cloudfront distribution with S3 static website bucket
-
-The 2 APIs in the code below are:
-- `cloudfront.distribution.exists`
-- `cloudfront.distribution.create`
-
-Notice that the only way to use `cloudfront.distribution.exists` with another predicate than the Cloudfront distribution ID is with tagging. This means that the distro MUST be tagged. 
+### `cloudfront.distribution.update`
 
 ```js
-const { error: { catchErrors, wrapErrors, mergeErrors } } = require('puffy')
-const { join } = require('path')
-const { s3, cloudfront, resource } = require('./src/_aws')
-
-const BUCKET = 'nic-today-20211015'
-const DISTRO = `${BUCKET}-distro`
-const REGION = 'ap-southeast-2'
+const { error: { catchErrors, wrapErrors } } = require('puffy')
+const { cloudfront } = require('./src/_aws')
 
 const main = () => catchErrors((async () => {
-	// 1.Making sure the bucket exists
-	if (!(await s3.bucket.exists(BUCKET))) {
-		console.log(`Creating bucket '${BUCKET}'...`)
-		const [createErrors, newBucket] = await s3.bucket.create({ 
-			name: BUCKET, 
-			acl: 'public-read',  // Default 'private'
-			region: REGION, // default: 'us-east-1' 
-			tags: { 
-				Project:'Demo', 
-				Env:'Dev' 
-			}
-		})
-
-		if (createErrors)
-			throw wrapErrors(`Bucket creation failed`, createErrors)
-
-		console.log(`Bucket '${BUCKET}' successfully created.`)
-	} else
-		console.log(`Bucket '${BUCKET}' already exists.`)
-
-	const [getErrors, bucketDetails] = await s3.bucket.get(BUCKET, { website:true })
-	if (getErrors)
-		throw wrapErrors(`Bucket info failed`, getErrors)
-
-	// 2. Making sure the website is set as a website
-	if (!bucketDetails.website) {
-		console.log(`Setting bucket '${BUCKET}' to website`)
-		const [websiteErrors] = await s3.bucket.setWebsite({ bucket:BUCKET })
-		if (websiteErrors)
-			throw wrapErrors(`Failed to set bucket as website`, websiteErrors)
-	} else
-		console.log(`Bucket '${BUCKET}' already set to website`)
-
-	// 3. Uploading files to the bucket
-	const [syncErrors] = await s3.bucket.files.sync({
-		bucket: BUCKET, 
-		dir: join(__dirname, './demo'), 
-		noWarning: true
+	// Invalidate all paths
+	const [updateErrors, results] = await cloudfront.distribution.update({ 
+		id:'E2WJO325O501XD', 
+		// tags: { Name:'my-distro' } // find by tags
+		config: { // Update
+			domain:bucketWeb01.bucketRegionalDomainName
+		} 
 	})
+	if (updateErrors)
+		throw wrapErrors('Failed to update distro', updateErrors) 
 
-	if (syncErrors)
-		throw wrapErrors(`Synching files failed`, syncErrors)
-
-	// 4. Adding a cloudfront distro on the bucket
-	const [distroExistsErrors, distroExists] = await cloudfront.distribution.exists({ 
-		tags: { Name:DISTRO }
-	})
-	if (distroExistsErrors)
-		throw wrapErrors(`Failed to confirm whether the distro exists or not`, distroExistsErrors)
-
-	if (!distroExists) {
-		console.log(`Creating new distro tagged 'Name:${DISTRO}' for bucket '${BUCKET}'`)
-		const [distroErrors, distro] = await cloudfront.distribution.create({
-			name: DISTRO,
-			domain: bucketDetails.bucketRegionalDomainName,
-			operationId: DISTRO, 
-			enabled: true,
-			tags: { 
-				Project:'Demo', 
-				Env:'Dev',
-				Name: DISTRO
-			}
-		})
-
-		if (distroErrors)
-			throw wrapErrors(`Distro creation failed`, distroErrors)
-
-		console.log(`Distro successfully created`)
-		console.log(distro)
-	} else
-		console.log(`Distro tagged 'Name:${DISTRO}' already exist`)
-})())
-
-main().then(([errors]) => {
-	if (errors)
-		console.error(mergeErrors(errors).stack)
-	else
-		console.log('All good')
-})
+	console.log('Distro update successfull')
+	console.log(results)
+	// {
+	// 	updateOccured: true, // False means that the last config is the same is the new, meaning there was no need for an update.
+	// 	config: {
+	// 		... 
+	// 	}
+	// }
 ```
-
-### Cloudfront distribution with private S3 bucket 
 
 ## DynamoDB
 
@@ -462,6 +406,11 @@ main().then(([errors]) => {
 ```
 
 ## S3
+
+For concrete examples, please refer to the [Annexes](#annexes):
+- [Cloudfront distribution with S3 static website bucket](#cloudfront-distribution-with-s3-static-website-bucket)
+- [Cloudfront distribution with private S3 bucket ](#cloudfront-distribution-with-private-s3-bucket)
+
 ### `s3.bucket.exists`
 
 ```js
@@ -780,31 +729,107 @@ This template offers preconfigured npm scripts that cover the most common deploy
 | `npm run deploy:dev` | `sls deploy --stage dev` | Basic deploy using the `serverless CLI` tool. Because no profile is passed, it first tries to use the profile defined in the `serverless.yml` under `provider.profile`. It falls back on the `default` profile defined under `~/.aws/credentials` if the serverless.yml file does not specify a profile. |
 | `npm run deploy:prod` | `sls deploy --stage prod --aws-profile neap_prod --force` | Explicitely defines which `~/.aws/credentials` to use and forces the deployment (i.e., deploy even if no changes to the infrastructure are detected). |
 
+# Annexes
+## Cloudfront distribution with S3 static website bucket
 
-# This Is What We re Up To
-We are Neap, an Australian Technology consultancy powering the startup ecosystem in Sydney. We simply love building Tech and also meeting new people, so don't hesitate to connect with us at [https://neap.co](https://neap.co).
+The 2 APIs in the code below are:
+- `cloudfront.distribution.exists`
+- `cloudfront.distribution.create`
 
-Our other open-sourced projects:
-#### GraphQL
-* [__*graphql-s2s*__](https://github.com/nicolasdao/graphql-s2s): Add GraphQL Schema support for type inheritance, generic typing, metadata decoration. Transpile the enriched GraphQL string schema into the standard string schema understood by graphql.js and the Apollo server client.
-* [__*schemaglue*__](https://github.com/nicolasdao/schemaglue): Naturally breaks down your monolithic graphql schema into bits and pieces and then glue them back together.
-* [__*graphql-authorize*__](https://github.com/nicolasdao/graphql-authorize.git): Authorization middleware for [graphql-serverless](https://github.com/nicolasdao/graphql-serverless). Add inline authorization straight into your GraphQl schema to restrict access to certain fields based on your user's rights.
+Notice that the only way to use `cloudfront.distribution.exists` with another predicate than the Cloudfront distribution ID is with tagging. This means that the distro MUST be tagged. 
 
-#### React & React Native
-* [__*react-native-game-engine*__](https://github.com/bberak/react-native-game-engine): A lightweight game engine for react native.
-* [__*react-native-game-engine-handbook*__](https://github.com/bberak/react-native-game-engine-handbook): A React Native app showcasing some examples using react-native-game-engine.
+```js
+const { error: { catchErrors, wrapErrors, mergeErrors } } = require('puffy')
+const { join } = require('path')
+const { s3, cloudfront, resource } = require('./src/_aws')
 
-#### Authentication & Authorization
-* [__*userin*__](https://github.com/nicolasdao/userin): UserIn let's App engineers to implement custom login/register feature using Identity Providers (IdPs) such as Facebook, Google, Github. 
+const BUCKET = 'nic-today-20211015'
+const DISTRO = `${BUCKET}-distro`
+const REGION = 'ap-southeast-2'
 
-#### General Purposes
-* [__*core-async*__](https://github.com/nicolasdao/core-async): JS implementation of the Clojure core.async library aimed at implementing CSP (Concurrent Sequential Process) programming style. Designed to be used with the npm package 'co'.
-* [__*jwt-pwd*__](https://github.com/nicolasdao/jwt-pwd): Tiny encryption helper to manage JWT tokens and encrypt and validate passwords using methods such as md5, sha1, sha256, sha512, ripemd160.
+const main = () => catchErrors((async () => {
+	// 1.Making sure the bucket exists
+	if (!(await s3.bucket.exists(BUCKET))) {
+		console.log(`Creating bucket '${BUCKET}'...`)
+		const [createErrors, newBucket] = await s3.bucket.create({ 
+			name: BUCKET, 
+			acl: 'public-read',  // Default 'private'
+			region: REGION, // default: 'us-east-1' 
+			tags: { 
+				Project:'Demo', 
+				Env:'Dev' 
+			}
+		})
 
-#### Google Cloud Platform
-* [__*google-cloud-bucket*__](https://github.com/nicolasdao/google-cloud-bucket): Nodejs package to manage Google Cloud Buckets and perform CRUD operations against them.
-* [__*google-cloud-bigquery*__](https://github.com/nicolasdao/google-cloud-bigquery): Nodejs package to manage Google Cloud BigQuery datasets, and tables and perform CRUD operations against them.
-* [__*google-cloud-tasks*__](https://github.com/nicolasdao/google-cloud-tasks): Nodejs package to push tasks to Google Cloud Tasks. Include pushing batches.
+		if (createErrors)
+			throw wrapErrors(`Bucket creation failed`, createErrors)
+
+		console.log(`Bucket '${BUCKET}' successfully created.`)
+	} else
+		console.log(`Bucket '${BUCKET}' already exists.`)
+
+	const [getErrors, bucketDetails] = await s3.bucket.get(BUCKET, { website:true })
+	if (getErrors)
+		throw wrapErrors(`Bucket info failed`, getErrors)
+
+	// 2. Making sure the website is set as a website
+	if (!bucketDetails.website) {
+		console.log(`Setting bucket '${BUCKET}' to website`)
+		const [websiteErrors] = await s3.bucket.setWebsite({ bucket:BUCKET })
+		if (websiteErrors)
+			throw wrapErrors(`Failed to set bucket as website`, websiteErrors)
+	} else
+		console.log(`Bucket '${BUCKET}' already set to website`)
+
+	// 3. Uploading files to the bucket
+	const [syncErrors] = await s3.bucket.files.sync({
+		bucket: BUCKET, 
+		dir: join(__dirname, './demo'), 
+		noWarning: true
+	})
+
+	if (syncErrors)
+		throw wrapErrors(`Synching files failed`, syncErrors)
+
+	// 4. Adding a cloudfront distro on the bucket
+	const [distroExistsErrors, distroExists] = await cloudfront.distribution.exists({ 
+		tags: { Name:DISTRO }
+	})
+	if (distroExistsErrors)
+		throw wrapErrors(`Failed to confirm whether the distro exists or not`, distroExistsErrors)
+
+	if (!distroExists) {
+		console.log(`Creating new distro tagged 'Name:${DISTRO}' for bucket '${BUCKET}'`)
+		const [distroErrors, distro] = await cloudfront.distribution.create({
+			name: DISTRO,
+			domain: bucketDetails.bucketRegionalDomainName,
+			operationId: DISTRO, 
+			enabled: true,
+			tags: { 
+				Project:'Demo', 
+				Env:'Dev',
+				Name: DISTRO
+			}
+		})
+
+		if (distroErrors)
+			throw wrapErrors(`Distro creation failed`, distroErrors)
+
+		console.log(`Distro successfully created`)
+		console.log(distro)
+	} else
+		console.log(`Distro tagged 'Name:${DISTRO}' already exist`)
+})())
+
+main().then(([errors]) => {
+	if (errors)
+		console.error(mergeErrors(errors).stack)
+	else
+		console.log('All good')
+})
+```
+
+## Cloudfront distribution with private S3 bucket 
 
 # License
 Copyright (c) 2017-2019, Neap Pty Ltd.

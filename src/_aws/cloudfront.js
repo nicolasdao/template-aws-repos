@@ -17,7 +17,12 @@ const resource = require('./resource')
  * @return {String} 				.domain	
  * @return {String} 				.status	
  * @return {Date} 					.lastUpdate	
- * @return {String} 				.eTag	
+ * @return {String} 				.eTag
+ * @return {Object} 				.origin	
+ * @return {String} 					.domain	
+ * @return {String} 					.type		Valid values: 's3'
+ * @return {[String]} 				.aliases
+ * @return {Boolean} 				.enabled	
  * @return {Object} 				.fullDetails	Original response
  */
 const selectDistribution = ({ id, tags, existMode }) => catchErrors((async() => {
@@ -32,7 +37,13 @@ const selectDistribution = ({ id, tags, existMode }) => catchErrors((async() => 
 			throw wrapErrors(errMsg, errors)
 
 		const { ETag, Distribution } = resp || {}
-		const { Id, ARN, Status, LastModifiedTime, DomainName } = Distribution || {} 
+		const { Id, ARN, Status, LastModifiedTime, DomainName, DistributionConfig } = Distribution || {} 
+		const { Origins, Aliases, Enabled } = DistributionConfig || {}
+		const origin = !Origins || !Origins.Items || !Origins.Items[0] ? null : {
+			domain: Origins.Items[0].DomainName,
+			type: _domainIsS3(Origins.Items[0].DomainName) ? 's3' : null
+		}
+		const aliases = !Aliases || !Aliases.Items ? null : Aliases.Items
 
 		if (existMode)
 			return Id !== undefined
@@ -44,6 +55,9 @@ const selectDistribution = ({ id, tags, existMode }) => catchErrors((async() => 
 			status: Status,
 			lastUpdate: LastModifiedTime,
 			eTag: ETag,
+			origin,
+			aliases,
+			enabled: Enabled,
 			fullDetails: Distribution
 		}] : []
 	} else {
@@ -170,8 +184,7 @@ const createDistribution = input => catchErrors((async() => {
 	allowedMethods = allowedMethods || ['GET', 'HEAD']
 	cachedMethods = cachedMethods || ['GET', 'HEAD']
 
-	const originIsS3 = /.*\.s3\.(.*?)amazonaws.com/.test(domain)
-	const customOriginConfig = !originIsS3 ? {} : {
+	const customOriginConfig = !_domainIsS3(domain) ? {} : {
 		CustomOriginConfig: {
 			HTTPPort: 80, 
 			HTTPSPort: 80,
@@ -279,6 +292,103 @@ const createDistribution = input => catchErrors((async() => {
 })())
 
 /**
+ * Gets a distribution's config. Doc: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/CloudFront.html#getDistributionConfig-property
+ * 
+ * @param  {String}	id							Distribution ID
+ * @param  {Object}	tags
+ *
+ * @return {Object}	config
+ * @return {String}		.id						Distribution ID
+ * @return {String}		.ETag
+ * @return {Object}		.DistributionConfig
+ */
+const getDistributionConfig = ({ id, tags }) => catchErrors((async() => {
+	const errMsg = 'Failed to get cloudfront distribution config'
+
+	if (!id) {
+		if (tags) {
+			const [errors, distros] = await selectDistribution({ tags })
+			if (errors)
+				throw wrapErrors(errMsg, errors)
+
+			if (!distros || !distros.length)
+				throw wrapErrors(errMsg, [new Error(`Cloudfront distribution not found for tags '${JSON.stringify(tags)}'.`)])			
+			if (distros.length > 1)
+				throw wrapErrors(errMsg, [new Error(`More than one Cloudfront distribution found for tags '${JSON.stringify(tags)}'.`)])			
+
+			id = distros[0].id
+		} else
+			return null
+	}
+
+	const [errors, config] = await _getDistributionConfig({ Id:id })
+	if (errors)
+		throw wrapErrors(errMsg, errors)
+
+	return { ...(config||{}), id }
+})())
+
+/**
+ * Updates a distribution config. Doc: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/CloudFront.html#updateDistribution-property
+ * 
+ * @param  {String}		id
+ * @param  {Object}		tags
+ * @param  {Object}		config
+ * @param  {String}			.domain
+ * @param  {Boolean}		.enable
+ * @param  {Boolean}		.disable
+ * 
+ * @return {Object} 	output
+ * @return {Boolean}		.updateOccured		False means that the last config is the same is the new, meaning there was no need for an update.
+ * @return {Object}			.config				New config	
+ */
+const updateDistribution = ({ id, tags, config }) => catchErrors((async() => {
+	const errMsg = 'Failed to update cloudfront distribution'
+
+	config = config || {}
+
+	if (!id && !tags)
+		throw wrapErrors(errMsg, [new Error('Missing required arguments. \'id\' or \'tags\' must be defined.')])
+
+	const [configErrors, currentConfig] = await getDistributionConfig({ id, tags })
+	if (configErrors)
+		throw wrapErrors(errMsg, configErrors)	
+	
+	if (!currentConfig || !currentConfig.DistributionConfig)
+		throw wrapErrors(errMsg, [new Error('Distribution config not found.')])		
+
+	const { id:distroId, ETag, DistributionConfig } = currentConfig || {}
+
+	let updateExists = false
+	if (config.domain) {
+		DistributionConfig.Origins = DistributionConfig.Origins || {}
+		DistributionConfig.Origins.Items = DistributionConfig.Origins.Items || []
+		if (DistributionConfig.Origins.Items[0] && DistributionConfig.Origins.Items[0].DomainName && DistributionConfig.Origins.Items[0].DomainName != config.domain) {
+			updateExists = true
+			DistributionConfig.Origins.Items[0].DomainName = config.domain
+		}
+	}
+	if (config.enable !== undefined && typeof(config.enable) == 'boolean' && DistributionConfig.Enabled != config.enable) {
+		updateExists = true
+		DistributionConfig.Enabled = config.enable
+	} else if (config.disable !== undefined && typeof(config.disable) == 'boolean' && DistributionConfig.Enabled == config.disable) {
+		updateExists = true
+		DistributionConfig.Enabled = !config.disable
+	}
+
+	if (updateExists) {
+		const [updateErrors] = await _updateDistribution({ Id:distroId, IfMatch:ETag, DistributionConfig })
+		if (updateErrors)
+			throw wrapErrors(errMsg, updateErrors)	
+	} 
+
+	return {
+		updateOccured: updateExists,
+		config: DistributionConfig
+	}
+})())
+
+/**
  * Invalidates one, many or all paths in a distribution. Doc: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/CloudFront.html#createInvalidation-property
  * 
  * @param  {String}		id				Required.
@@ -333,6 +443,7 @@ const invalidateDistribution = ({ id, operationId, paths }) => catchErrors((asyn
 	}
 })())
 
+const _domainIsS3 = domain => /.*\.s3\.(.*?)amazonaws.com/.test(domain||'')
 
 const _promisify = fn => (...args) => catchErrors(new Promise((next,fail) => {
 	cloudfront[fn](...args, (err,data) => {
@@ -346,6 +457,8 @@ const _promisify = fn => (...args) => catchErrors(new Promise((next,fail) => {
 const _createDistribution = _promisify('createDistributionWithTags')
 const _createInvalidation = _promisify('createInvalidation')
 const _getDistribution = _promisify('getDistribution')
+const _getDistributionConfig = _promisify('getDistributionConfig')
+const _updateDistribution = _promisify('updateDistribution')
 
 module.exports = {
 	distribution: {
@@ -353,7 +466,8 @@ module.exports = {
 		select: selectDistribution,
 		find: findDistribution,
 		create: createDistribution,
-		invalidate: invalidateDistribution
+		invalidate: invalidateDistribution,
+		update: updateDistribution
 	}
 }
 
