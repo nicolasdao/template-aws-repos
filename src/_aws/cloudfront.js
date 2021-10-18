@@ -14,7 +14,7 @@ const resource = require('./resource')
  * @return {[Object]|Boolean}	data[]				If 'existMode' is true, the output is a boolean.
  * @return {String} 				.id	
  * @return {String} 				.arn	
- * @return {String} 				.domainName	
+ * @return {String} 				.domain	
  * @return {String} 				.status	
  * @return {Date} 					.lastUpdate	
  * @return {String} 				.eTag	
@@ -37,15 +37,15 @@ const selectDistribution = ({ id, tags, existMode }) => catchErrors((async() => 
 		if (existMode)
 			return Id !== undefined
 
-		return [{
+		return Id ? [{
 			id: Id,
 			arn: ARN,
-			domainName: DomainName,
+			domain: DomainName,
 			status: Status,
 			lastUpdate: LastModifiedTime,
 			eTag: ETag,
 			fullDetails: Distribution
-		}]
+		}] : []
 	} else {
 		const [errors, resp] = await resource.getByTags({ tags, region: 'us-east-1', types: ['cloudfront:distribution'] })
 		if (errors)
@@ -74,6 +74,24 @@ const selectDistribution = ({ id, tags, existMode }) => catchErrors((async() => 
 	}
 })())
 
+
+/**
+ * Finds distribution by id or tags.
+ * 
+ * @param  {String}	id
+ * @param  {Object}	tags
+ * 		
+ * @return {Object}	data				
+ * @return {String} 	.id	
+ * @return {String} 	.arn	
+ * @return {String} 	.domain	
+ * @return {String} 	.status	
+ * @return {Date} 		.lastUpdate	
+ * @return {String} 	.eTag	
+ * @return {Object} 	.fullDetails	Original response
+ */
+const findDistribution = ({ id, tags }) => selectDistribution({ id, tags }).then(data => data[0] ? data : [null, (data[1]||[])[0]])
+
 /**
  * Checks if at least one distribution matches the predicates.
  * 
@@ -97,6 +115,8 @@ const distributionExists = ({ id, tags }) => catchErrors((async() => {
 
 /**
  * Cloudfront distribution doc: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/CloudFront.html#createDistributionWithTags-property
+ * Side-effects:
+ * 	- If no "Name" tag is explicitly defined, one is created using the 'name' value.
  * 
  * @param  {String}		name				Required.
  * @param  {String}		domain				Required. e.g., bucket.bucketRegionalDomainName
@@ -116,7 +136,7 @@ const distributionExists = ({ id, tags }) => catchErrors((async() => {
  * @return {String}			.arn
  * @return {String}			.status
  * @return {String}			.domain
- * @return {Object}			.response		Original response.
+ * @return {Object}			.fullDetails	Original response.
  */
 const createDistribution = input => catchErrors((async() => {
 	let {
@@ -142,6 +162,10 @@ const createDistribution = input => catchErrors((async() => {
 		throw wrapErrors(errMsg, [new Error('Missing required argument \'domain\'')])
 	if (!operationId)
 		throw wrapErrors(errMsg, [new Error('Missing required argument \'operationId\'')])
+
+	tags = tags || {}
+	if (!tags.Name)
+		tags.Name = name
 
 	allowedMethods = allowedMethods || ['GET', 'HEAD']
 	cachedMethods = cachedMethods || ['GET', 'HEAD']
@@ -250,7 +274,7 @@ const createDistribution = input => catchErrors((async() => {
 		arn: ARN,
 		status: Status,
 		domain: DomainName,
-		response: resp
+		fullDetails: resp
 	}
 })())
 
@@ -327,6 +351,7 @@ module.exports = {
 	distribution: {
 		exists: distributionExists,
 		select: selectDistribution,
+		find: findDistribution,
 		create: createDistribution,
 		invalidate: invalidateDistribution
 	}

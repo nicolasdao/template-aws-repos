@@ -6,6 +6,10 @@ The __*AWS SDK Repos*__ project is a fork from the [https://github.com/nicolasda
 > * [Install](#install) 
 > * [APIs](#apis)
 >	- [Cloudfront](#cloudfront)
+>		- [`cloudfront.distribution.exists`](#cloudfrontdistributionexists)
+>		- [`cloudfront.distribution.select` and `cloudfront.distribution.find`](#cloudfrontdistributionselect-and-cloudfrontdistributionfind`)
+>		- [`cloudfront.distribution.create`](#cloudfrontdistributioncreate)
+>		- [`cloudfront.distribution.invalidate`](#cloudfrontdistributioninvalidate)
 >		- [Cloudfront distribution with S3 static website bucket](#cloudfront-distribution-with-s3-static-website-bucket)
 >		- [Cloudfront distribution with private S3 bucket ](#cloudfront-distribution-with-private-s3-bucket)
 >	- [DynamoDB](#dynamodb)
@@ -40,7 +44,146 @@ npm start
 # APIs
 ## Cloudfront
 
-The next sample is a bit long but necessary to understand the context in which a Cloufront distribution can be created. This option below show a bucket set up as a website. This is the easiest setup. The other setup is a [private S3 bucket set up with OAI](#cloudfront-distribution-with-private-s3-bucket) (i.e., Origin Access Identity).
+### `cloudfront.distribution.exists`
+
+```js
+const { error: { catchErrors, wrapErrors } } = require('puffy')
+const { cloudfront } = require('./src/_aws')
+
+const DISTRO = `my-distro-name`
+
+const main = () => catchErrors((async () => {
+	// ID exists
+	const [idExistsErrors, idExists] = await cloudfront.distribution.exists({ 
+		id: '12345'
+	})
+	if (idExistsErrors)
+		throw wrapErrors(`Failed to find by ID`, idExistsErrors)
+	else 
+		console.log(`ID exists`)
+
+	// Distro with tag exists
+	const [tagExistsErrors, tagExists] = await cloudfront.distribution.exists({ 
+		tags: { Name:DISTRO }
+	})
+	if (tagExistsErrors)
+		throw wrapErrors(`Failed to find by ID`, tagExistsErrors)
+	else 
+		console.log(`Tag exists`)
+```
+
+### `cloudfront.distribution.select` and `cloudfront.distribution.find`
+
+`find` and `select` uses the same API. `find` returns an object while `select` returns an array.
+
+```js
+const { error: { catchErrors, wrapErrors } } = require('puffy')
+const { cloudfront } = require('./src/_aws')
+
+const DISTRO = `my-distro-name`
+
+const main = () => catchErrors((async () => {
+	// Find by ID
+	const [distroErrors, distro] = await cloudfront.distribution.find({ 
+		id: '12345'
+	})
+	if (distroErrors)
+		throw wrapErrors(`Failed to find by ID`, distroErrors)
+	else if (distro)
+		console.log(distro)
+		// {
+		// 	id: 'E2WJO325O501XD',
+		// 	arn: 'arn:aws:cloudfront::084126072180:distribution/E2WJO325O501XD',
+		// 	domainName: 'dyoumeptyjf92.cloudfront.net',
+		// 	status: 'InProgress',
+		// 	lastUpdate: 2021-10-15T08:40:11.908Z,
+		// 	eTag: 'E1AQWRQF1J4O48'	
+		// }
+	else
+		console.log(`Distro not found`)
+
+	// Find by tag
+	const [distro2Errors, distro2] = await cloudfront.distribution.find({ 
+		tags: { Name:DISTRO }
+	})
+	if (distro2Errors)
+		throw wrapErrors(`Failed to find by tag`, distro2Errors)
+	else if (distro2)
+		console.log(distro2)
+		// {
+		// 	id: 'E2WJO325O501XD',
+		// 	arn: 'arn:aws:cloudfront::084126072180:distribution/E2WJO325O501XD',
+		// 	domainName: 'dyoumeptyjf92.cloudfront.net',
+		// 	status: 'InProgress',
+		// 	lastUpdate: 2021-10-15T08:40:11.908Z,
+		// 	eTag: 'E1AQWRQF1J4O48'	
+		// }
+	else
+		console.log(`Distro not found`)
+```
+
+### `cloudfront.distribution.create`
+
+```js
+const { error: { catchErrors, wrapErrors } } = require('puffy')
+const { cloudfront } = require('./src/_aws')
+
+const DISTRO = `my-distro-name`
+
+const main = () => catchErrors((async () => {
+	const [distroErrors, distro] = await cloudfront.distribution.create({
+		name: DISTRO,
+		domain: 'my-bucket-website.s3.ap-southeast-2.amazonaws.com',
+		operationId: '123456', 
+		enabled: true,
+		tags: { 
+			Project:'Demo', 
+			Env:'Dev',
+			Name: DISTRO
+		}
+	})
+
+	if (distroErrors)
+		throw wrapErrors(`Distro creation failed`, distroErrors)
+
+	console.log(distro)
+	// {
+	// 	id: 'E2WJO325O501XD',
+	// 	arn: 'arn:aws:cloudfront::084126072180:distribution/E2WJO325O501XD',
+	// 	status: 'InProgress'.
+	// 	domain: 'dyoumeptyjf92.cloudfront.net'
+	// }
+```
+
+### `cloudfront.distribution.invalidate`
+
+```js
+const { error: { catchErrors, wrapErrors } } = require('puffy')
+const { cloudfront } = require('./src/_aws')
+
+const main = () => catchErrors((async () => {
+	// Invalidate all paths
+	const [invalidationErrors, invalidation] = await cloudfront.distribution.invalidate({ 
+		id: 'E2WJO325O501XD', 
+		operationId: `${Date.now()}`, 
+		paths: ['/*']
+	})
+	if (invalidationErrors)
+		throw wrapErrors(`Failed to invalidate distro`, invalidationErrors) 
+
+	console.log('Distro invalidation started')
+	console.log(invalidation)
+	// {
+	// 	location: 'https://cloudfront.amazonaws.com/2019-03-26/distribution/E3ICGTU0Z3IYAZ/invalidation/IGLGGAGD9PT2X',
+	// 	invalidation: {
+	// 		id: 'IGLGGAGD9PT2X',
+	// 		status: 'InProgress',
+	// 		createTime: 2021-10-16T04:14:34.514Z,
+	// 		paths: [ '/*' ],
+	// 		operationId: '1634357673513'
+	// 	}
+	// }
+```
 
 ### Cloudfront distribution with S3 static website bucket
 
@@ -48,7 +191,7 @@ The 2 APIs in the code below are:
 - `cloudfront.distribution.exists`
 - `cloudfront.distribution.create`
 
-Notcice that the only way to use `cloudfront.distribution.exists` with another predicate than the Cloudfront distribution ID is with tagging. This means that the distro MUST be tagged. 
+Notice that the only way to use `cloudfront.distribution.exists` with another predicate than the Cloudfront distribution ID is with tagging. This means that the distro MUST be tagged. 
 
 ```js
 const { error: { catchErrors, wrapErrors, mergeErrors } } = require('puffy')
@@ -474,7 +617,7 @@ const { join } = require('path')
 const { s3 } = require('.src/_aws')
 
 const main = () => catchErrors((async () => {
-	const [syncErrors, filesInDir] = await s3.bucket.files.sync({ 
+	const [syncErrors, synchedData] = await s3.bucket.files.sync({ 
 		bucket: 'my-super-bucket', 
 		dir: join(__dirname, './app'), 
 		ignore: '**/node_modules/**', 
@@ -484,9 +627,31 @@ const main = () => catchErrors((async () => {
 	if (syncErrors)
 		throw wrapErrors('Failed to sync files to bucket', syncErrors)
 	else {
-		console.log(`${filesInDir.length} files in directory`)
-		console.log(filesInDir[0].key)
-		console.log(filesInDir[0].hash)
+		console.log(synchedData)
+		// {
+		// 	updated: true, // True means at least one file was either uploaded or deleted.
+		// 	srcFiles:[{
+		// 		file: '/Users/you/Documents/my-app/bundle.js',
+		// 		dir: '/Users/you/Documents/my-app/',
+		// 		key: 'bundle.js',
+		// 		path: '/bundle.js',
+		// 		hash: '32132313213123321313',
+		// 		contentType: 'application/javascript',
+		// 		contentLength: '12345',
+		// 		content: 'dewdwedewdeewdedewdedewdedewdeew...',
+		// 	}],
+		// 	uploadedFiles:[{
+		// 		file: '/Users/you/Documents/my-app/bundle.js',
+		// 		dir: '/Users/you/Documents/my-app/',
+		// 		key: 'bundle.js',
+		// 		path: '/bundle.js',
+		// 		hash: '32132313213123321313',
+		// 		contentType: 'application/javascript',
+		// 		contentLength: '12345',
+		// 		content: 'dewdwedewdeewdedewdedewdedewdeew...',
+		// 	}],
+		// 	deletedFiles:[]
+		// }
 	}
 }
 })())
