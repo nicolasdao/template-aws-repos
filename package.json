@@ -27,7 +27,7 @@
   "license": "BSD-3-Clause",
   "dependencies": {
     "@neap/funky": "^0.4.0",
-    "aws-sdk": "^2.521.0",
+    "aws-sdk": "^2.814.0",
     "core-async": "^2.0.5",
     "fast-glob": "^3.2.7",
     "form-data": "^2.4.0",
