@@ -413,6 +413,22 @@ const uploadFiles = ({ bucket, files, dir, ignore, ignoreObjects }) => catchErro
 	return objects
 })())
 
+/**
+ * Uploads an object in a bucket under a specific key. Doc: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#putObject-property
+ * 
+ * @param  {Object}	input		
+ * @param  {Buffer}		.Body
+ * @param  {String}		.Bucket					e.g., 'my-super-bucket'
+ * @param  {String}		.Key					e.g., 'assets/images/hello.jpeg'
+ * @param  {String}		.ContentType			e.g., 'image/jpeg'
+ * @param  {String}		.CacheControl			e.g., 'max-age=172800' (full spec at https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.9)
+ * @param  {Number}		.ContentLength
+ * @param  {String}		.ServerSideEncryption	e.g., 'AES256'
+ * @param  {String}		.StorageClass			e.g., 'STANDARD_IA'
+ * @param  {String}		.Tagging				e.g., 'key1=value1&key2=value2'
+ * 
+ * @return {Void}
+ */
 const putObject = (...args) => new Promise(next => {
 	try {
 		s3.putObject(...args, (err, data) => err ? next([[err],null]) : next([null,data]))
